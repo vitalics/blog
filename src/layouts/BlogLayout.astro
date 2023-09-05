@@ -64,7 +64,7 @@ const fullUpdatedDate = updatedDate?.toLocaleDateString("en", {
           class="aspect-square w-10"
           width={80}
           height={80}
-          />
+        />
       </div>
       <p class="dark:text-zinc-400 text-zinc-700 text-sm">
         <span class="block font-semibold">{name}</span>
@@ -101,3 +101,11 @@ const fullUpdatedDate = updatedDate?.toLocaleDateString("en", {
   </article>
   <Pagination />
 </AppLayout>
+<script
+  is:inline
+  type="module"
+  set:html={`
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true });
+`}
+></script>

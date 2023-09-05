@@ -47,7 +47,7 @@ import { dbg } from '@rslike/dbg'
 
 const variable = 123;
 
-dbg(() => variable) // variable: 123
+dbg(() => variable) // dbg | variable: 123
 ```
 
 Easy, isn't it?
@@ -57,7 +57,7 @@ Easy, isn't it?
 What if you would like to use another delimiter between variable name and value?
 
 ```ts
-// advanced/delimiter
+// advanced/delimiter.ts
 
 import { dbg } from '@rslike/dbg'
 

@@ -8,7 +8,6 @@ heroAlt: "Spiral Shell"
 ---
 import FileTree from '../../components/FileTree.astro'
 
-
 ## Context
 
 My projects are very huge and complex, we're working on automotive industry and our mission - make users happy with minimal involving. The user should fullfil financial info and upload driver license - and then he can purchase any car, matched by his financial capabilities. As I mentioned before - this is huge project with a lot of involving teams. On this project my role - lead and drive core changes of automation framework.
@@ -50,11 +49,8 @@ MacBook Pro 13-inch, 2020, Intel Core i5
 
 Each command, like `build`, `lint`, `test`, has been written in typescript and runs with following options:
 
-```mermaid
-flowchart LR
-
-  A[npm run build 'options'] ---> B[node -r ts-node/register -r tsconfig-paths/register 'path' 'options']
-  B ---> C[execute '.ts' file with 'options']
+```text
+  npm run build 'options' -> node -r ts-node/register -r tsconfig-paths/register 'path' 'options' -> execute '.ts' file with 'options'
 ```
 
 Now lets see build command sources
