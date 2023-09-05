@@ -7,7 +7,7 @@ export const defaultMeta = {
   description:
     "Welcome to my personal website! I am a SDET and Certified Node.js Application Developer(JSNAD).",
   ogImage: {
-    src: "../assets/images/me.jpg",
+    src: "../assets/images/me.jpeg",
     alt: "Photo of the author",
   },
 };
