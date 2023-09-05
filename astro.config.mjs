@@ -21,7 +21,7 @@ const astroExpressiveCodeOptions = {
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://example.com',
+  site: 'https://blog-mu-three-75.vercel.app',
   integrations: [astroExpressiveCode(astroExpressiveCodeOptions), mdx(), sitemap(), tailwind()],
   image: {
     service: sharpImageService()

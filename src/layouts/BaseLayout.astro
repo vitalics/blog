@@ -93,7 +93,7 @@ const LDJSON = {
         {
           routes.map((item) => (
             <li>
-              <Link {...item} transition:name={item.text} />
+              <Link {...item} transition:name={item.text} transition:animate="fade" />
             </li>
           ))
         }

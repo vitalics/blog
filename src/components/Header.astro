@@ -1,13 +1,16 @@
 ---
-interface Props {
+import type { HTMLAttributes } from "astro/types";
+interface Props extends HTMLAttributes<"h1"> {
   title: string;
 }
 
-const { title } = Astro.props;
+const { title, ...props } = Astro.props;
 ---
 
 <h1
   class="mb-6 dark:text-zinc-200 text-zinc-900 text-3xl font-bold tracking-tight sm:text-4xl"
+  {...props}
 >
   {title}
+  <slot />
 </h1>
