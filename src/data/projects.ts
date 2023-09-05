@@ -9,8 +9,7 @@ export default [
   {
     "name": "rslike",
     "url": "https://github.com/vitalics/rslike",
-    "description": `🦀 Rust-like standard javascript typesafe library to remove undefined behavior.
-    Includes several packages like "std", "cmp", "dbg"`,
+    "description": '🦀 Rust-like standard javascript typesafe library to remove undefined behavior.' + 'Includes several packages like "std", "cmp", "dbg"',
     "languages": [
       "TypeScript"
     ],
@@ -21,7 +20,19 @@ export default [
     "url": "https://github.com/vitalics/Telegraph",
     "description": "⚛️ use JSX for building telegram bots",
     "languages": [
-      "TypeScript"
+      "TypeScript",
+      "⚛️ React"
+    ],
+    "role": "author"
+  },
+  {
+    "name": "playwright-angular-selectors",
+    "url": "https://github.com/vitalics/playwright-angular-selectors",
+    "description": "🛡️ Angular selectors engine for playwright",
+    "languages": [
+      "TypeScript",
+      "🎭 Playwright",
+      "🛡️ Angular"
     ],
     "role": "author"
   },
