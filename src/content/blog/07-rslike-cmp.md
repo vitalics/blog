@@ -7,9 +7,13 @@ hero: "../../assets/images/07-rslike-cmp-hero.webp"
 heroAlt: "rslike/cmp package"
 ---
 
-At the previous article I was described my new package distributed via npm - @rslike/std - standard JS library which allows to remove undefined behavior in your code. But today, std is not a part of our story.
+## The Problem
 
-Today, I'm gonna show you comparison package(@rslike/cmp). Using this package you can compare your classes and(or) objects like a pro.
+At the previous article I was described my new package distributed via npm - `@rslike/std` - standard JS library which allows to remove undefined behavior in your code. But today, std is not a part of our story.
+
+## The Solution
+
+Today, I'm gonna show you comparison package(`@rslike/cmp`). Using this package you can compare your classes and(or) objects like a pro.
 
 How to install:
 
@@ -81,8 +85,10 @@ That's because I use the same(mostly inspired) types(traits) from [rustlang](htt
 
 That's it for today. Check it out [`std`](https://www.npmjs.com/package/@rslike/std) package.
 
+## UPD
+
 P.S. I was release 2.x version since new package cmp was included and now here is 3 packages:
 
-- std
-- cmp
-- debug (from 2.1.x)
+- [std](https://www.npmjs.com/package/@rslike/std)
+- [cmp](https://www.npmjs.com/package/@rslike/cmp)
+- [dbg](https://www.npmjs.com/package/@rslike/dbg)

@@ -16,12 +16,12 @@ const astroExpressiveCodeOptions = {
   styleOverrides: {
     codeFontSize: '1rem',
   },
-
+  shiki: true,
 };
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://blog-mu-three-75.vercel.app',
+  site: 'https://blog-vitaliharadkou.vercel.app/',
   integrations: [astroExpressiveCode(astroExpressiveCodeOptions), mdx(), sitemap(), tailwind()],
   image: {
     service: sharpImageService()
