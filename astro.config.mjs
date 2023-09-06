@@ -67,9 +67,6 @@ export default defineConfig({
       rawFonts([".ttf", ".woff"]),
       VitePWA({
         registerType: "autoUpdate",
-        devOptions: {
-          enabled: true,
-        },
         manifest,
         workbox: {
           globDirectory: "dist",
