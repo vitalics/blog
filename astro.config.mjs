@@ -4,6 +4,7 @@ import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
 import partytown from "@astrojs/partytown";
 import vercel from "@astrojs/vercel/static";
+import { VitePWA } from "vite-plugin-pwa";
 
 import tailwind from "@astrojs/tailwind";
 import astroExpressiveCode from "astro-expressive-code";
@@ -12,6 +13,8 @@ import remarkToc from "remark-toc";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeToc from "rehype-toc";
+
+import { manifest } from "./src/data/manifest";
 
 /** @type {import('astro-expressive-code').AstroExpressiveCodeOptions} */
 const astroExpressiveCodeOptions = {
@@ -60,7 +63,25 @@ export default defineConfig({
     inlineStylesheets: "auto",
   },
   vite: {
-    plugins: [rawFonts([".ttf", ".woff"])],
+    plugins: [
+      rawFonts([".ttf", ".woff"]),
+      VitePWA({
+        registerType: "autoUpdate",
+        devOptions: {
+          enabled: true,
+        },
+        manifest,
+        workbox: {
+          globDirectory: "dist",
+          globPatterns: [
+            "**/*.{js,css,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,eot,ico}",
+          ],
+          // Don't fallback on document based (e.g. `/some-page`) requests
+          // This removes an errant console.log message from showing up.
+          navigateFallback: null,
+        },
+      }),
+    ],
     optimizeDeps: {
       exclude: ["@resvg/resvg-js"],
     },
