@@ -32,7 +32,6 @@
   },
   "devDependencies": {
     "@astrojs/partytown": "^2.0.0",
-    "@astrojs/vercel": "^4.0.4",
     "@resvg/resvg-js": "^2.4.1",
     "astro-diagram": "^0.7.0",
     "mermaid": "^10.4.0",

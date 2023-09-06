@@ -3,7 +3,6 @@ import { defineConfig, sharpImageService } from "astro/config";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
 import partytown from "@astrojs/partytown";
-import vercel from "@astrojs/vercel/static";
 import { VitePWA } from "vite-plugin-pwa";
 
 import tailwind from "@astrojs/tailwind";
@@ -37,13 +36,6 @@ export default defineConfig({
       config: {
         forward: ["dataLayer.push"],
       },
-    }),
-    vercel({
-      analytics: true,
-      imagesConfig: {
-        sizes: [320, 640, 1280],
-      },
-      imageService: true,
     }),
   ],
   image: {
