@@ -33,6 +33,12 @@ const fullUpdatedDate = updatedDate?.toLocaleDateString("en", {
   month: "long",
   day: "numeric",
 });
+
+const shareData = JSON.stringify({
+  url: new URL(Astro.url).href,
+  title,
+  text: description,
+});
 ---
 
 <AppLayout
@@ -50,8 +56,10 @@ const fullUpdatedDate = updatedDate?.toLocaleDateString("en", {
       {fullPubDate}
     </time>
     <h1
+      id="title"
       class="flex items-center justify-center gap-3 text-2xl sm:text-4xl pb-8 font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-500 via-blue-500 to-purple-500"
       transition:name={title}
+      data-share={shareData}
     >
       {title}
     </h1>
@@ -101,11 +109,28 @@ const fullUpdatedDate = updatedDate?.toLocaleDateString("en", {
   </article>
   <Pagination />
 </AppLayout>
-<script
-  is:inline
-  type="module"
-  set:html={`
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true });
-`}
-></script>
+<script>
+  const shareSupported =
+    navigator.share && typeof navigator.share === "function";
+
+  const title = document.querySelector("h1#title")!;
+
+  if (shareSupported) {
+    const button$ = document.createElement("button");
+    button$.id = "share-icon";
+    button$.innerHTML = `<svg viewBox="0 0 512 512" class="w-12 dark:text-zinc-400 text-zinc-600" astro-icon="ion:share-outline"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M336 192h40a40 40 0 0 1 40 40v192a40 40 0 0 1-40 40H136a40 40 0 0 1-40-40V232a40 40 0 0 1 40-40h40M336 128l-80-80-80 80M256 321V48"></path></svg>`;
+    title.appendChild(button$);
+
+    async function share() {
+      const parsedData = JSON.parse((title as any).dataset.share);
+
+      try {
+        await navigator.share(parsedData);
+        console.log("shared successfully!");
+      } catch (err) {
+        console.error(`Error: ${err}`);
+      }
+    }
+    button$.addEventListener("click", share);
+  }
+</script>
