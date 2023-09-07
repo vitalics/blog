@@ -46,6 +46,15 @@ export default [
     "role": "contributor"
   },
   {
+    "name": "allure-js",
+    "url": "https://github.com/allure-framework/allure-js",
+    "description": "Allure integrations for JavaScript test frameworks",
+    "languages": [
+      "TypeScript",
+    ],
+    "role": "contributor"
+  },
+  {
     "name": "DevExpress/testcafe",
     "url": "https://github.com/DevExpress/testcafe",
     "description": "A Node.js tool to automate end-to-end web testing.",
