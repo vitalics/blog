@@ -105,7 +105,7 @@ export default function(){
   const wsResponse = ws.connect(`{BASE_URL}/account/ws/account`, socket => {
     socket = socket
     socket.on('open', () => {
-      // ESSENTIAL to send on open, otherwise signalR will not trigger handshake
+      // ESSENTIAL
       // from: https://stackoverflow.com/a/76677753
       socket.send(JSON.stringify({ protocol: 'json', version: 1 }) + '\x1e')
     })
@@ -131,6 +131,12 @@ export default function(){
   socket.close();
 }
 ```
+
+## Notes & Observations
+
+1. We need to send next JSON(`{ protocol: 'json', version: 1 }`) - otherwise signalR will reject handshake.
+2. On each message - you need to add at the end of string `\x1e`. This symbol means ASCII "Record Separator". SignalR used it as "end of sended message".
+3. if you send something on your backend - make sure that `invocationId` is unique(e.g. increment after send info on the server), or you'll get an error from signalR backend.
 
 Let's execute it by following command:
 
