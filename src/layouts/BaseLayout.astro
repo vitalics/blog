@@ -2,6 +2,7 @@
 import { ViewTransitions } from "astro:transitions";
 import { name, defaultMeta } from "../data/socials";
 import routes from "../data/routes";
+import { GOOGLE_SITE_VERIFICATION } from "../data/common";
 
 import Link from "../components/Link.astro";
 
@@ -80,9 +81,10 @@ const LDJSON = {
         />
       )
     }
-
+    <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />
     <script is:inline src="/registerSW.js"></script>
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
     <meta name="theme-color" content="#d4d4d8" />
     <!-- <script type="application/ld+json" set:html={JSON.stringify(LDJSON, null, 2)} /> -->
 
@@ -118,7 +120,9 @@ const LDJSON = {
                 {...item}
                 transition:name={item.text}
                 transition:animate="fade"
-              />
+              >
+                {item.text}
+              </Link>
             </li>
           ))
         }
