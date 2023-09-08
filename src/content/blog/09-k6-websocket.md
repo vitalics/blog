@@ -1,7 +1,7 @@
 ---
-title: "k6: How to test you websockets"
-description: At this article I'll share about testing websocket using k6 load tool.
-pubDate: 2023-09-06
+title: "k6: How to test you signalR websockets"
+description: At this article I'll share how to load test backend which was written using signalR library.
+pubDate: 2023-09-08
 # updatedDate: 2023-09-05
 hero: "../../assets/images/09-k6-websockets.webp"
 heroAlt: "k6 + websockets"
@@ -24,7 +24,7 @@ unlike HTTP - websockets are bi-directional internet protocol, unlike HTTP it st
 
 ## Where used websockets?
 
-Websockets are very useful when you would like to show information in realtime. It can be chat application (like slack, teams or google chat) or weather app or Crypto Market(like Binance).
+Websockets are very useful when you would like to show information in realtime. It can be chat application (like slack, teams or google chat) or online games or Crypto Market(like Binance).
 
 ### Chrome Devtools
 
@@ -52,7 +52,7 @@ etc.
 
 ## Application example
 
-Before start testing - you need an app shich you will test in.
+Before start testing - you need an app which you will test in.
 
 Let's assume that this application is already exists.
 
@@ -63,7 +63,7 @@ And you test API will be looks like this:
 
 [GET] /account/ws/account -> returns `Websocket` upgrading connection and subscribes into account updates
 
-[POST] /account/update -> updates user info
+[POST] /account/update -> updates user info, triggers `/account/ws/account` socket connections
 ```
 
 ## Installing k6
@@ -78,15 +78,58 @@ brew install k6
 
 ## load test scenario
 
+### Remark: signalR
+
+`signalR` - is a library to handle websocket using ASP.NET client. It also has implementation for JavaScript/Typescript. and it's name [`@microsoft/signalr`](https://www.npmjs.com/package/@microsoft/signalr)
+
 Let's write some scenario:
 
 ```js
 // account.test.js
+import check from 'k6/check'
+import http from 'k6/http'
 import ws from 'k6/ws'
 
 
 // ESSENTIAL:
-export default function(){}
+export default function(){
+  const loginResponse = http.post(`{BASE_URL}/account/login`);
+
+  check(loginResponse, {
+    'status is 200': () => loginResponse.status === 200,
+  })
+
+  const token = loginResponse.json('accessToken')
+  let data = [];
+  let socket = null
+  const wsResponse = ws.connect(`{BASE_URL}/account/ws/account`, socket => {
+    socket = socket
+    socket.on('open', () => {
+      // ESSENTIAL to send on open, otherwise signalR will not trigger handshake
+      // from: https://stackoverflow.com/a/76677753
+      socket.send(JSON.stringify({ protocol: 'json', version: 1 }) + '\x1e')
+    })
+    socket.on('message', (data) => {
+      // data example: [{field1: "value 1"}]
+      const msg = JSON.parse(msg) // backend returns objects as string
+      data = msg;
+    })
+  })
+
+  const updateResponse = http.post(`{BASE_URL}/account/update`);
+
+  check(updateResponse, {
+    'status is 200': () => updateResponse.status === 200,
+  })
+
+  check(data, {
+    "0 element should be 'value 1'": () => data[0].field1 === 'value 1'
+  })
+
+  // end test. close socket.
+  // otherwise test will never ends
+  socket.close();
+}
 ```
 
 Let's execute it by following command:
@@ -97,4 +140,9 @@ k6 account.test.js
 
 And the report will be looks like screen below:
 
-<!-- screenshot -->
+![result](../../assets/images/09-websocket-result.png)
+> Image 2. execution result. See at `ws_*` line.
+
+That's it! See you soon!
+
+## Bye

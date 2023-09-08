@@ -118,7 +118,9 @@ const LDJSON = {
                 {...item}
                 transition:name={item.text}
                 transition:animate="fade"
-              />
+              >
+                {item.text}
+              </Link>
             </li>
           ))
         }

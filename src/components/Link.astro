@@ -2,9 +2,9 @@
 import type { HTMLAttributes } from "astro/types";
 
 interface Props extends HTMLAttributes<"a"> {
-  text: string;
+  disabled?: boolean;
 }
-const { text, href, ...props } = Astro.props;
+const { href, disabled, ...props } = Astro.props;
 let isActive: boolean;
 if (!href) {
   isActive = false;
@@ -17,16 +17,26 @@ if (!href) {
 }
 ---
 
-<a
-  class:list={[
-    "font-semibold text-sm block py-2.5 px-3 dark:hover:bg-zinc-700/50 hover:bg-zinc-100",
-    { "dark:text-teal-400 text-blue-600": isActive },
-    { "dark:text-zinc-200 text-zinc-600": !isActive },
-  ]}
-  aria-current={isActive ? "page" : undefined}
-  href={href}
-  {...props}
-  aria-label={`Go to ${text} page`}
->
-  {text}
-</a>
+<span class:list={[{ "cursor-not-allowed": disabled }]}>
+  <a
+    class:list={[
+      "font-semibold text-sm block py-2.5 px-3 dark:hover:bg-zinc-700/50 hover:bg-zinc-100",
+      { "dark:text-teal-400 text-blue-600": isActive },
+      { "dark:text-zinc-200 text-zinc-600": !isActive },
+      { "pointer-events-none cursor-not-allowed": disabled },
+    ]}
+    aria-disabled={disabled}
+    aria-current={isActive ? "page" : undefined}
+    href={href}
+    {...props}
+  >
+    <slot />
+  </a>
+</span>
+<style>
+  a[aria-disabled="true"] {
+    pointer-events: none;
+    text-decoration: none;
+    cursor: not-allowed;
+  }
+</style>
