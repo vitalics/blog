@@ -46,8 +46,8 @@ export default defineConfig({
     remarkPlugins: [remarkToc],
     rehypePlugins: [
       rehypeSlug,
-      [rehypeAutolinkHeadings, { behavior: "append" }],
-      [rehypeToc, { headings: ["h1", "h2"] }],
+      [rehypeAutolinkHeadings, { behavior: 'append' }],
+      [rehypeToc, { headings: ['h1', 'h2', 'h3'] }],
     ],
   },
   compressHTML: true,
