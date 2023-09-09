@@ -1,0 +1,56 @@
+---
+import Icon from "astro-icon";
+
+export type Props = {
+  totalPages: number;
+  pageNum: number;
+  prevDisabled?: boolean;
+  nextDisabled?: boolean;
+};
+
+const {
+  pageNum,
+  totalPages,
+  prevDisabled = false,
+  nextDisabled = false,
+} = Astro.props;
+---
+
+{
+  totalPages > 1 && (
+    <nav class="flex items-center justify-evenly" aria-label="Pagination">
+      <span class:list={[{ "cursor-not-allowed": prevDisabled }]}>
+        <a
+          href={`/blog${pageNum - 1 !== 1 ? "/" + (pageNum - 1) : ""}`}
+          class:list={[
+            "mr-4 select-none dark:text-zinc-200 text-zinc-600 hover:text-zinc-500",
+            { "pointer-events-none opacity-50": prevDisabled },
+          ]}
+          aria-label="previous"
+        >
+          <Icon name="ph:arrow-left" class="w-6 h-6" />
+          Prev
+        </a>
+      </span>
+      <span class:list={[{ "cursor-not-allowed": nextDisabled }]}>
+        <a
+          href={`/blog/${pageNum + 1}`}
+          class:list={[
+            "ml-4 select-none dark:text-zinc-200 text-zinc-600 hover:text-zinc-500",
+            { "pointer-events-none opacity-50": nextDisabled },
+          ]}
+          aria-label="next"
+        >
+          Next
+          <Icon name="ph:arrow-right" class="w-6 h-6" />
+        </a>
+      </span>
+    </nav>
+  )
+}
+<style>
+  a[aria-label="next"],
+  a[aria-label="previous"] {
+    @apply flex items-center gap-1;
+  }
+</style>

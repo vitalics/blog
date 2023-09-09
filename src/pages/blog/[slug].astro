@@ -1,0 +1,54 @@
+---
+import { type CollectionEntry, getCollection } from "astro:content";
+import BlogLayout from "../../layouts/BlogLayout.astro";
+import getSortedPosts from "../../utils/getSortedPosts";
+import getPageNumbers from "../../utils/getPageNumbers";
+import { POSTS_PER_PAGE } from "../../data/common";
+import BlogListLayout from "../../layouts/BlogListLayout.astro";
+
+const posts = await getCollection("blog");
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog");
+  const postResult = posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { blog: post },
+  }));
+
+  const pagePaths = getPageNumbers(posts.length).map((pageNum) => ({
+    params: { slug: String(pageNum) },
+  }));
+  return [...postResult, ...pagePaths];
+}
+type Props = {
+  blog: CollectionEntry<"blog">;
+};
+
+const { blog } = Astro.props;
+const { slug } = Astro.params;
+
+const sortedPosts = getSortedPosts(posts);
+
+const totalPages = getPageNumbers(sortedPosts.length);
+
+const currentPage =
+  slug && !isNaN(Number(slug)) && totalPages.includes(Number(slug))
+    ? Number(slug)
+    : 0;
+const lastPost = currentPage * POSTS_PER_PAGE;
+const startPost = lastPost - POSTS_PER_PAGE;
+
+const paginatedPosts = sortedPosts.slice(startPost, lastPost);
+---
+
+{
+  blog ? (
+    <BlogLayout post={blog} />
+  ) : (
+    <BlogListLayout
+      posts={paginatedPosts}
+      pageNum={currentPage}
+      totalPages={totalPages.length}
+    />
+  )
+}

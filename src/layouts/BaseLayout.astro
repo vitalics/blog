@@ -6,6 +6,13 @@ import { GOOGLE_SITE_VERIFICATION } from "../data/common";
 
 import Link from "../components/Link.astro";
 
+export type Props = {
+  title?: string;
+  description?: string;
+  ogImage?: { src: string; alt: string };
+  pubDate?: Date;
+};
+
 const {
   title = defaultMeta.title,
   description = defaultMeta.description,
@@ -119,7 +126,6 @@ const LDJSON = {
               <Link
                 {...item}
                 transition:name={item.text}
-                transition:animate="fade"
               >
                 {item.text}
               </Link>
@@ -128,7 +134,10 @@ const LDJSON = {
         }
       </ul>
     </nav>
-    <main class="px-6 lg:px-0 mx-auto max-w-3xl" id="main-content">
+    <main
+      class="px-6 lg:px-0 mx-auto max-w-3xl flex flex-col gap-4"
+      id="main-content"
+    >
       <slot />
     </main>
     <style>
