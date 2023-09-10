@@ -10,4 +10,9 @@ export const defaultMeta = {
     src: "../assets/images/me.jpeg",
     alt: "Photo of the author",
   },
+  email: 'vitalicset@gmail.com',
+  github: 'vitalics',
+  linkedIn: 'vitalicset',
+  telegram: 'vitalicset',
+  twitter: 'GorodkovVi85373',
 };

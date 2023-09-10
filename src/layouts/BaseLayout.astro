@@ -5,6 +5,7 @@ import routes from "../data/routes";
 import { GOOGLE_SITE_VERIFICATION } from "../data/common";
 
 import Link from "../components/Link.astro";
+import Footer from "../components/Footer.astro";
 
 export type Props = {
   title?: string;
@@ -123,10 +124,7 @@ const LDJSON = {
         {
           routes.map((item) => (
             <li>
-              <Link
-                {...item}
-                transition:name={item.text}
-              >
+              <Link {...item} transition:name={item.text}>
                 {item.text}
               </Link>
             </li>
@@ -140,6 +138,7 @@ const LDJSON = {
     >
       <slot />
     </main>
+    <Footer class:list={"px-6 lg:px-0 mx-auto max-w-3xl flex flex-col gap-4"} />
     <style>
       nav {
         -ms-overflow-style: none; /* Internet Explorer 10+ */
