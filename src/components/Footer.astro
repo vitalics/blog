@@ -1,0 +1,54 @@
+---
+import { Icon } from "astro-icon";
+import { defaultMeta } from "../data/socials";
+
+const { github, email, linkedIn, telegram, twitter } = defaultMeta;
+---
+
+<div class="mt-12 flex flex-col gap-2">
+  <span class="dark:text-zinc-300 text-zinc-700 text-center">All my Links:</span>
+  <hr class="m-auto w-[10rem]" />
+
+  <footer role="contentinfo" class="flex items-center justify-center gap-4">
+    <a
+      aria-label="Email"
+      href={`mailto:${email}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Email</span>
+      <Icon name="line-md:email-twotone" class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="Github"
+      href={`https://github.com/${github}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Github</span>
+      <Icon name="mdi:github" class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="LinkedIn"
+      href={`https://www.linkedin.com/in/${linkedIn}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">LinkedIn</span>
+      <Icon name="mdi:linkedin" class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="Telegram"
+      href={`https://www.t.me/${telegram}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Telegram</span>
+      <Icon name="la:telegram" class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="X"
+      href={`https://twitter.com/${twitter}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Twitter</span>
+      <Icon name="mdi:twitter" class="w-6 h-6" />
+    </a>
+  </footer>
+</div>
