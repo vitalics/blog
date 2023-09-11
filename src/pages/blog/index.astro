@@ -1,11 +1,6 @@
 ---
 import { getCollection } from "astro:content";
-import { Icon } from "astro-icon";
 
-import AppLayout from "../../layouts/BaseLayout.astro";
-import BlogCard from "../../components/BlogCard.astro";
-import Header from "../../components/Header.astro";
-import { name } from "../../data/socials";
 import getSortedPosts from "../../utils/getSortedPosts";
 import getPageNumbers from "../../utils/getPageNumbers";
 import { POSTS_PER_PAGE } from "../../data/common";

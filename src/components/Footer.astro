@@ -1,12 +1,19 @@
 ---
-import { Icon } from "astro-icon";
 import { defaultMeta } from "../data/socials";
+import Devto from "./Icons/Devto.astro";
+import Email from "./Icons/Email.astro";
+import Github from "./Icons/Github.astro";
+import LinkedIn from "./Icons/LinkedIn.astro";
+import Telegram from "./Icons/Telegram.astro";
+import Twitter from "./Icons/Twitter.astro";
+import Medium from "./Icons/Medium.astro";
 
-const { github, email, linkedIn, telegram, twitter } = defaultMeta;
+const { github, email, linkedIn, telegram, twitter, devto, medium } = defaultMeta;
 ---
 
 <div class="mt-12 flex flex-col gap-2">
-  <span class="dark:text-zinc-300 text-zinc-700 text-center">All my Links:</span>
+  <span class="dark:text-zinc-300 text-zinc-700 text-center">All my Links:</span
+  >
   <hr class="m-auto w-[10rem]" />
 
   <footer role="contentinfo" class="flex items-center justify-center gap-4">
@@ -16,7 +23,8 @@ const { github, email, linkedIn, telegram, twitter } = defaultMeta;
       class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
     >
       <span class="sr-only">Email</span>
-      <Icon name="line-md:email-twotone" class="w-6 h-6" />
+      <Email class="w-6 h-6" />
+      <!-- <Icon name="line-md:email-twotone" class="w-6 h-6" /> -->
     </a>
     <a
       aria-label="Github"
@@ -24,7 +32,7 @@ const { github, email, linkedIn, telegram, twitter } = defaultMeta;
       class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
     >
       <span class="sr-only">Github</span>
-      <Icon name="mdi:github" class="w-6 h-6" />
+      <Github class="w-6 h-6" />
     </a>
     <a
       aria-label="LinkedIn"
@@ -32,7 +40,7 @@ const { github, email, linkedIn, telegram, twitter } = defaultMeta;
       class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
     >
       <span class="sr-only">LinkedIn</span>
-      <Icon name="mdi:linkedin" class="w-6 h-6" />
+      <LinkedIn class="w-6 h-6" />
     </a>
     <a
       aria-label="Telegram"
@@ -40,7 +48,7 @@ const { github, email, linkedIn, telegram, twitter } = defaultMeta;
       class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
     >
       <span class="sr-only">Telegram</span>
-      <Icon name="la:telegram" class="w-6 h-6" />
+      <Telegram class="w-6 h-6" />
     </a>
     <a
       aria-label="X"
@@ -48,7 +56,23 @@ const { github, email, linkedIn, telegram, twitter } = defaultMeta;
       class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
     >
       <span class="sr-only">Twitter</span>
-      <Icon name="mdi:twitter" class="w-6 h-6" />
+      <Twitter class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="Devto"
+      href={`https://dev.to/${devto}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Dev.to</span>
+      <Devto class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="medium"
+      href={`https://medium.com/${medium}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Medium</span>
+      <Medium class="w-6 h-6" />
     </a>
   </footer>
 </div>

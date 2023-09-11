@@ -2,6 +2,7 @@
 import { Icon } from "astro-icon";
 import type { Project } from "../data/projects";
 import Badge from "./Badge.astro";
+import Github from "./Icons/Github.astro";
 
 interface Props extends Project {}
 
@@ -32,10 +33,13 @@ const { name, role, url, description, languages } = Astro.props;
       aria-label={`Open ${name} repository in a new tab`}
       class="flex items-center"
     >
-      <Icon
+      <Github
+        class:list={"w-6 fill-current dark:hover:text-zinc-300 hover:text-zinc-600 hover:scale-110 transition-all"}
+      />
+      <!-- <Icon
         name="mdi:github"
         class="w-6 fill-current dark:hover:text-zinc-300 hover:text-zinc-600 hover:scale-110 transition-all"
-      />
+      /> -->
     </a>
   </div>
   {description && <p class="leading-relaxed">{description}</p>}

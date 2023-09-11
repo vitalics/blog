@@ -1,12 +1,11 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import BaseLayout from "./BaseLayout.astro";
-import Link from "../components/Link.astro";
 import { name } from "../data/socials";
 import Header from "../components/Header.astro";
-import Icon from "astro-icon";
 import BlogCard from "../components/BlogCard.astro";
 import BlogListPagination from "../components/BlogListPagination.astro";
+import Rss from "../components/Icons/Rss.astro";
 
 export interface Props {
   pageNum: number;
@@ -26,8 +25,8 @@ const description =
 
 <BaseLayout title={title} description={description}>
   <Header title={`Blog. ${pageNum > 1 ? `Page ${pageNum}` : ""}`}>
-    <a href="/rss.xml" aria-label="rss feed">
-      <Icon name="ph:rss" class="w-6" />
+    <a href="/rss.xml" aria-label="rss feed" class="hover:text-zinc-500">
+      <Rss class="w-6" />
     </a>
   </Header>
   <p

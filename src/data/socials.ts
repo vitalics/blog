@@ -15,4 +15,6 @@ export const defaultMeta = {
   linkedIn: 'vitalicset',
   telegram: 'vitalicset',
   twitter: 'GorodkovVi85373',
+  devto: 'vitalicset',
+  medium: '@vitalicset'
 };

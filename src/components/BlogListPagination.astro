@@ -1,5 +1,6 @@
 ---
-import Icon from "astro-icon";
+import ArrowRight from "./Icons/ArrowRight.astro";
+import ArrowLeft from "./Icons/ArrowLeft.astro";
 
 export type Props = {
   totalPages: number;
@@ -28,7 +29,7 @@ const {
           ]}
           aria-label="previous"
         >
-          <Icon name="ph:arrow-left" class="w-6 h-6" />
+          <ArrowLeft class="w-6 h-6" />
           Prev
         </a>
       </span>
@@ -42,7 +43,7 @@ const {
           aria-label="next"
         >
           Next
-          <Icon name="ph:arrow-right" class="w-6 h-6" />
+          <ArrowRight class="w-6 h-6" />
         </a>
       </span>
     </nav>

@@ -14,8 +14,6 @@ interface Props {
 
 const { post } = Astro.props;
 
-console.log("TITLE:", post.data.title);
-
 const { title, description, hero, heroAlt, pubDate, updatedDate } = post.data;
 
 const url = post.slug;
