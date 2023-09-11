@@ -1,0 +1,188 @@
+---
+title: "Bun: Is it fast for test automation?"
+description: Is Bunjs runtime faster than package manager scripts? Let's check it out and compare bun vs pnpm vs yarn vs npm!
+pubDate: 2023-09-10
+# updatedDate: 2023-09-05
+hero: "../../assets/images/10-bun-hero.png"
+heroAlt: "bun v1 is out!"
+---
+
+import FileTree from "../../components/FileTree.astro";
+
+## What is Bun?
+
+From [official site](https://bun.sh/) - Bun is a fast JavaScript all-in-one toolkit/bundler/runtime/package-manager/test runner.
+
+Bun - it's similar to node.js and Deno - both of them are JavaScript runtimes.
+
+Deno also can supports typescript out-of box and compilation step does not required.
+
+## Environment information
+
+I use MacBook Pro 14-inch, 2023.
+
+| Name                             | Description          |
+| -------------------------------- | -------------------- |
+| Chip                             | Apple M2 Pro         |
+| Memory                            | 16 GB               |
+| OS                               | 14.0 Beta (23A5337a) |
+| [npm](https://docs.npmjs.com/)   | 9.6.7                |
+| [yarn](https://yarnpkg.com/)     | 1.22.19              |
+| [pnpm](https://pnpm.io/)         | 8.7.0                |
+| [node.js](https://nodejs.org/en) | v18.17.1             |
+| [bun](https://bun.sh/)           | 1                    |
+
+## How to install Bun
+
+From Official site:
+
+```sh
+curl -fsSL https://bun.sh/install | bash
+```
+
+## Test
+
+**Disclaimer:** I cannot test bun on the current project, since we use unimplemented bun `node:` API. When bun will fully compatable with node.js - I will retest on the real project.
+
+The test is simple. We will run both `headless` and `headful` modes
+
+<video controls width="600" autoplay>
+  <source src="/videos/10-bun-pnpm-performance.webm" type="video/webm" />
+</video>
+> Video 1. Repesentation of headless mode.
+
+Project structure will be looks like this:
+
+<FileTree title="Project Structure">
+- src
+  - **demo.test.ts** - our scenario to test
+- package.json 
+- **playwright.config.ts** playwright configuration
+</FileTree>
+
+### Round 1. Headful mode
+
+playwright Configuration will be looks like this:
+
+```ts
+// playwright.config.ts
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  // Look for test files in the "tests" directory, relative to this configuration file.
+  testDir: "tests",
+  workers: 1,
+  use: {
+    // Base URL to use in actions like `await page.goto('/')`.
+    baseURL: "https://google.com",
+    launchOptions: {
+      // headful mode
+      headless: false,
+    },
+  },
+  // Configure projects for major browsers.
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+});
+```
+
+And Test file will be looks like:
+
+```ts
+// tests/some.test.ts
+import { test, expect } from "@playwright/test";
+
+test("should work", async ({ page }) => {
+  // opens baseURL
+  await page.goto("/");
+});
+```
+
+Let's see some results:
+
+| Launch # | [Bun](https://bun.sh/) | [pnpm](https://pnpm.io/) | [yarn](https://yarnpkg.com/) | [npm](https://docs.npmjs.com/) |
+| -------- | :--------------------: | :----------------------: | :--------------------------: | :----------------------------: |
+| 1        |          2.6           |           2.87           |             2.77             |              2.75              |
+| 2        |          2.5           |           2.72           |             2.71             |              2.66              |
+| 3        |          2.45          |           2.77           |             2.68             |              2.64              |
+| 4        |          2.51          |           3.05           |             2.77             |              2.67              |
+|          |                        |        **Median**        |                              |                                |
+| N/A      |          2.5           |           2.82           |            2.735             |             2.665              |
+|          |                        |      **Difference**      |                              |                                |
+| N/A      |           0            |           12%            |             9.4%             |              6.6%              |
+
+> Table 1. [Bun](https://bun.sh/) vs. [pnpm](https://pnpm.io/) vs [yarn](https://yarnpkg.com/) vs [npm](https://docs.npmjs.com/). Headful mode. Time in seconds
+
+Very impressive. Bun is about `12%` faster than pnpm in execution time. Npm is a second after bun! 🤯
+
+### Round 2. Headless mode
+
+Same test file, but let's update configuration in `playwright.config.ts` file
+
+```ts
+// playwright.config.ts
+
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  // Look for test files in the "tests" directory, relative to this configuration file.
+  testDir: "tests",
+  workers: 1,
+  use: {
+    // Base URL to use in actions like `await page.goto('/')`.
+    baseURL: "https://google.com",
+    launchOptions: {
+      // headless mode
+      headless: true,
+    },
+  },
+  // Configure projects for major browsers.
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+});
+```
+
+| Launch # | [Bun](https://bun.sh/) | [pnpm](https://pnpm.io/) | [yarn](https://yarnpkg.com/) | [npm](https://docs.npmjs.com/) |
+| -------- | :--------------------: | :----------------------: | :--------------------------: | :----------------------------: |
+| 1        |          1.97          |           2.16           |             2.07             |              2.17              |
+| 2        |          1.97          |           2.24           |             2.32             |              2.1               |
+| 3        |          1.97          |           2.20           |             2.06             |              2.17              |
+| 4        |          2.02          |           2.22           |             2.19             |              2.14              |
+|          |                        |        **Median**        |                              |                                |
+| N/A      |          1.97          |           2.21           |             2.13             |              2.15              |
+|          |                        |      **Difference**      |                              |                                |
+| N/A      |           0            |           12%            |              8%              |               9%               |
+
+> Table 2. [Bun](https://bun.sh/) vs. [pnpm](https://pnpm.io/) vs [yarn](https://yarnpkg.com/) vs [npm](https://docs.npmjs.com/). Headless mode. Time in seconds
+
+Difference between executions for pnpm and bun is about **`12%`**! pnpm is a slowest!
+
+## Conclusion
+
+I was impressive! Bun is `12%` faster than pnpm; `9%` faster than yarn and `8%` faster than npm
+
+**NOTE 1:** I cannot test bun on the current project, since we use unimplemented bun `node:` API. When bun will fully compatable with node.js - I will retest on the real project.
+
+**Observation 1**: NPM is a second after bun by execution time. It blows my mind! 🤯
+
+**Observation 2**: PNPM is a slowest package manager by execution time. Nevertheless, I'm still like it by [installation and lock-resolving time](https://pnpm.io/benchmarks).
+
+I thing that Bun is preferable than Deno! Why? Because deno starts own ecosystem without node.js compatibility and it's have own package system (as URL importing instead of local package name). URL import notation can confused developers and it always to be remember package URL.
+
+## Bunbye!
+
+## Used Links
+
+- [1]: https://docs.npmjs.com/ - npm
+- [2]: https://yarnpkg.com/ - yarn
+- [3]: https://pnpm.io/> pnpm
+- [4]: https://bun.sh/> bun
+- [5]: https://nodejs.org/en> nodejs
