@@ -10,7 +10,7 @@ export const manifest: Partial<ManifestOptions> = {
   description:
     defaultMeta.description, // Change this to your websites description.
   theme_color: "#d4d4d8", // Change this to your primary color.
-  background_color: "#262626", // Change this to your background color.
+  background_color: "#f4f4f5", // Change this to your background color.
   display: "minimal-ui",
   icons: [
     {

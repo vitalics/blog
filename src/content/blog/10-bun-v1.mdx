@@ -7,6 +7,7 @@ hero: "../../assets/images/10-bun-hero.png"
 heroAlt: "bun v1 is out!"
 ---
 
+import { YouTube } from 'astro-embed';
 import FileTree from "../../components/FileTree.astro";
 
 ## What is Bun?
@@ -24,7 +25,7 @@ I use MacBook Pro 14-inch, 2023.
 | Name                             | Description          |
 | -------------------------------- | -------------------- |
 | Chip                             | Apple M2 Pro         |
-| Memory                            | 16 GB               |
+| Memory                           | 16 GB                |
 | OS                               | 14.0 Beta (23A5337a) |
 | [npm](https://docs.npmjs.com/)   | 9.6.7                |
 | [yarn](https://yarnpkg.com/)     | 1.22.19              |
@@ -46,9 +47,7 @@ curl -fsSL https://bun.sh/install | bash
 
 The test is simple. We will run both `headless` and `headful` modes
 
-<video controls width="600" autoplay>
-  <source src="/videos/10-bun-pnpm-performance.webm" type="video/webm" />
-</video>
+<YouTube id="https://youtu.be/-69-MD8Essg" />
 > Video 1. Repesentation of headless mode.
 
 Project structure will be looks like this:
