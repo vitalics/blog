@@ -7,8 +7,10 @@ import LinkedIn from "./Icons/LinkedIn.astro";
 import Telegram from "./Icons/Telegram.astro";
 import Twitter from "./Icons/Twitter.astro";
 import Medium from "./Icons/Medium.astro";
+import Hashnode from "./Icons/Hashnode.astro";
 
-const { github, email, linkedIn, telegram, twitter, devto, medium } = defaultMeta;
+const { github, email, linkedIn, telegram, twitter, devto, medium, hashnode } =
+  defaultMeta;
 ---
 
 <div class="mt-12 flex flex-col gap-2">
@@ -73,6 +75,14 @@ const { github, email, linkedIn, telegram, twitter, devto, medium } = defaultMet
     >
       <span class="sr-only">Medium</span>
       <Medium class="w-6 h-6" />
+    </a>
+    <a
+      aria-label="hashnode"
+      href={`https://hashnode.com/${hashnode}`}
+      class="dark:text-zinc-300 text-zinc-700 hover:text-zinc-500"
+    >
+      <span class="sr-only">Hashnode</span>
+      <Hashnode class="w-6 h-6" />
     </a>
   </footer>
 </div>
