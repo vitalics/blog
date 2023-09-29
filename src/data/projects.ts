@@ -7,6 +7,15 @@ export type Project = {
 };
 export default [
   {
+    "name": "ajv-ts",
+    "url": "https://github.com/vitalics/ajv-ts",
+    "description": 'Ajv types with first-class typescript inspired from zod',
+    "languages": [
+      "TypeScript"
+    ],
+    "role": "author"
+  },
+  {
     "name": "rslike",
     "url": "https://github.com/vitalics/rslike",
     "description": '🦀 Rust-like standard javascript typesafe library to remove undefined behavior.' + 'Includes several packages like "std", "cmp", "dbg"',
