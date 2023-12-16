@@ -25,7 +25,15 @@ Our test automation framework is using [playwright](https://playwright.dev/docs/
 
 We was implemented [playwright reporter](https://github.com/vitalics/playwright-prometheus-remote-write-reporter) which push metrics directly from tests (or reporter) into prometheus instance.
 
-### Technical deep
+## How you sends metrics?
+
+The initial idea was adopt the sources from [prometheus-remote-write](https://github.com/huksley/prometheus-remote-write).
+
+Unfortunately, I have a few problems with it, so I made a decision to use the package, intead of adopt the source code.
+
+We use [prometheus-remote-write](https://github.com/huksley/prometheus-remote-write) package to archieve the goal.
+
+### Technical details
 
 <FileTree title="Project Structure">
 - src
@@ -82,9 +90,12 @@ export { Counter, Gauge }
 export default class PrometheusReporter implements Reporter {
   private test = new Counter({
     name: 'test'
-  }, 0)
+  }, 1) // always static, let it be 1
   constructor(options){
     this.options = options
+  }
+  private async send(timeseries: Timeseries | Timeseries[]){
+    // send metrics to prometheus using options
   }
   async onTestEnd(test, result) {
     this.test.labels({
@@ -93,7 +104,7 @@ export default class PrometheusReporter implements Reporter {
       // ...etc
     }).inc()
 
-    await pushTimeseries(this.test._getSeries(), this.options)
+    await this.send(this.test._getSeries())
 
     this.test.reset() // new test, new counter
   }
@@ -135,6 +146,38 @@ export default defineConfig({
 })
 ```
 
+## Use custom metrics
+
+Apart of built in metrics. We export `Counter` and `Gauge` classes to make custome metrics exportable
+
+```ts
+// example.test.ts
+import { test } from '@playwright/test'
+import { Counter } from 'playwright-prometheus-remote-write-reporter'
+
+const gotoCounter = new Counter({
+  name: 'url',
+}, 0)
+
+test('example test', async ({page}) => {
+  await page.goto('http://example.com')
+  gotoCounter.labels({
+    url: 'http://example.com'
+  }).inc() // 1
+
+  await page.goto('https://playwright.dev')
+  gotoCounter.labels({
+    url: 'https://playwright.dev'
+  }).inc() // 2
+})
+
+test.afterEach(() => {
+  gotoCounter.collect() // send to prometheus
+  gotoCounter.reset() // reset counter after each test
+})
+
+```
+
 ## Result
 
 As you can see - now your metrics is exportable and ready to display in grafana.
@@ -156,3 +199,4 @@ As you can see - now your metrics is exportable and ready to display in grafana.
 - [4]: https://qameta.io - allure testops
 - [5]: https://prometheus.io - prometheus
 - [6]: https://grafana.com - grafana
+- [7]: https://github.com/huksley/prometheus-remote-write - prometheus remote write node.js library
