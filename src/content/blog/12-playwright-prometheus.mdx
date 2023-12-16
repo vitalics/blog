@@ -130,6 +130,12 @@ pnpm add playwright-prometheus-remote-write-reporter # pnpm
 bun a playwright-prometheus-remote-write-reporter # bun
 ```
 
+### What metrics collected by default?
+
+By default we collect nodejs internals stats and playwright exposed metrics, like project, test, annotations, test duration etc.
+
+Full list of collected metrics you may found [here](https://github.com/vitalics/playwright-prometheus-remote-write-reporter?tab=readme-ov-file#collected-metrics)
+
 ### Enable reporter
 
 in your `playwight.config.ts` add next line
