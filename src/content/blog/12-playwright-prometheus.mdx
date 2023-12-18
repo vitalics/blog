@@ -1,5 +1,5 @@
 ---
-title: "Playwright & Prometheus. Send your metrics in realtime"
+title: "Playwright & Prometheus. Send your metrics in real-time"
 description: How we use prometheus to send metrics from playwright tests
 pubDate: 2023-12-18
 hero: "../../assets/images/12-pw-prometheus-hero.png"
@@ -8,14 +8,13 @@ heroAlt: "Playwright and Prometheus"
 
 import FileTree from "../../components/FileTree.astro";
 
-## What is Playwright?
+## What is a Playwright?
 
-[Playwright](https://playwright.dev) is a test automation library from microsoft.
-It is designed to test web applications across different browsers, providing a unified API to automate browsers like Chromium, Firefox, and WebKit
+[Playwright](https://playwright.dev) is a test automation library from Microsoft. It is designed to test web applications across different browsers, providing a unified API to automate browsers like Chromium, Firefox, and WebKit
 
 ## Context
 
-Our test automation framework is using [playwright](https://playwright.dev/docs/intro) as a test library and [allure testops](https://qameta.io/) as a reporter. But it collects only test metrics, like pass/fail scenarios, show attachments and stdin/out. But what happends with node.js while test scenarios has been executed? To answer this question we decide to collect deep metrics and export it to prometheus, because we already use it for showing k6 tests metrics. After collecting these metrics to prometheus it automatically bypass to [grafana](https://grafana.com/). With grafana we built some infografics about run.
+Our test automation framework is using [playwright](https://playwright.dev/docs/intro) as a test library and [allure testops](https://qameta.io/) as a reporter. But it collects only test metrics, like pass/fail scenarios, and shows attachments and stdin/out. But what happens with node.js while test scenarios have been executed? To answer this question we decided to collect deep metrics and export them to Prometheus because we already use it for showing k6 test metrics. After collecting these metrics to Prometheus it automatically bypasses [Grafana](https://grafana.com/). With Grafana we built some infographics about run.
 
 ## What is Prometheus?
 
@@ -23,15 +22,15 @@ Our test automation framework is using [playwright](https://playwright.dev/docs/
 
 ## What was implemented?
 
-We was implemented [playwright reporter](https://github.com/vitalics/playwright-prometheus-remote-write-reporter) which push metrics directly from tests (or reporter) into prometheus instance.
+We implemented a [playwright reporter](https://github.com/vitalics/playwright-prometheus-remote-write-reporter) that pushes metrics directly from tests (or reporters) into the Prometheus instance.
 
 ## How you sends metrics?
 
-The initial idea was adopt the sources from [prometheus-remote-write](https://github.com/huksley/prometheus-remote-write).
+TThe initial idea was to adopt the sources from [prometheus-remote-write](https://github.com/huksley/prometheus-remote-write).
 
-Unfortunately, I have a few problems with it, so I made a decision to use the package, intead of adopt the source code.
+Unfortunately, I have a few problems with it, so I decided to use the package, instead of adopting the source code.
 
-We use [prometheus-remote-write](https://github.com/huksley/prometheus-remote-write) package to archieve the goal.
+We use [prometheus-remote-write](https://github.com/huksley/prometheus-remote-write) package to achieve the goal.
 
 ### Technical details
 
@@ -77,7 +76,7 @@ export class Gauge extends Counter {
 }
 ```
 
-`index.ts` file use this metrics to collect on own it's side
+`index.ts` file uses these metrics to collect on its own it's side
 
 ``` ts
 // index.ts
@@ -114,12 +113,12 @@ export default class PrometheusReporter implements Reporter {
 
 ## How to start?
 
-Before to install the package you need to configure prometheus.
+Before installing the package you need to configure Prometheus.
 
 - Enable remote-write feature. See what [`prometheus.yml`](https://github.com/vitalics/playwright-prometheus-remote-write-reporter/blob/main/example/prometheus.yml) we use.
-- Start docker container(or restart remote instance) with feature: `--enable-feature=remote-write-receiver`. See example from [`package.json`](https://github.com/vitalics/playwright-prometheus-remote-write-reporter/blob/main/example/package.json#L16)
+- Start the docker container(or restart the remote instance) with the feature: `--enable-feature=remote-write-receiver`. See example from [`package.json`](https://github.com/vitalics/playwright-prometheus-remote-write-reporter/blob/main/example/package.json#L16)
 
-Now you are ready to move futher
+Now you are ready to move further
 
 ### Install the package
 
@@ -130,9 +129,9 @@ pnpm add playwright-prometheus-remote-write-reporter # pnpm
 bun a playwright-prometheus-remote-write-reporter # bun
 ```
 
-### What metrics collected by default?
+### What metrics are collected by default?
 
-By default we collect nodejs internals stats and playwright exposed metrics, like project, test, annotations, test duration etc.
+By default, we collect node js internals stats and playwright-exposed metrics, like a project, test, annotations, test duration, etc.
 
 Full list of collected metrics you may found [here](https://github.com/vitalics/playwright-prometheus-remote-write-reporter?tab=readme-ov-file#collected-metrics)
 
@@ -141,6 +140,7 @@ Full list of collected metrics you may found [here](https://github.com/vitalics/
 in your `playwight.config.ts` add next line
 
 ```ts
+// playwight.config.ts
 export default defineConfig({
 // ...
   reporter: [
@@ -154,7 +154,7 @@ export default defineConfig({
 
 ## Use custom metrics
 
-Apart of built in metrics. We export `Counter` and `Gauge` classes to make custome metrics exportable
+Apart from built-in metrics. We export `Counter` and `Gauge` classes to make custom metrics exportable
 
 ```ts
 // example.test.ts
@@ -186,14 +186,14 @@ test.afterEach(() => {
 
 ## Result
 
-As you can see - now your metrics is exportable and ready to display in grafana.
+As you can see - now your metrics are exportable and ready to display in Grafana.
 
 ![prometheus result](../../assets/images/12-result.png)
 > Image 1. Result from package example
 
-**Note 1**: Unfortunately, in my machine grafana cannot establish connection to prometheus. So you might see only local prometheus instance.
+**Note 1**: Unfortunately, in my machine grafana cannot establish the connection to Prometheus. So you might see only the local Prometheus instance.
 
-**Note 2**: During project limitation I cannot show how it looks like in our self-hosted grafana
+**Note 2**: During project limitation, I cannot show how it looks like in our self-hosted grafana
 
 ## Happy metric collection!
 
