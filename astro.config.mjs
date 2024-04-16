@@ -7,11 +7,8 @@ import { VitePWA } from "vite-plugin-pwa";
 
 import tailwind from "@astrojs/tailwind";
 import astroExpressiveCode from "astro-expressive-code";
-import remarkToc from "remark-toc";
-import remarkUnwrapImages from "remark-unwrap-images";
 
 import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeToc from "rehype-toc";
 
 import { manifest } from "./src/data/manifest";
@@ -44,10 +41,10 @@ export default defineConfig({
   },
   markdown: {
     syntaxHighlight: "prism",
-    remarkPlugins: [remarkToc, remarkUnwrapImages],
+    remarkPlugins: [],
     rehypePlugins: [
       rehypeSlug,
-      [rehypeAutolinkHeadings, { behavior: "append" }],
+      // [rehypeAutolinkHeadings, { behavior: "append" }],
       [rehypeToc, { headings: ["h1", "h2", "h3"] }],
     ],
   },

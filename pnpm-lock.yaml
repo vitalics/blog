@@ -17,6 +17,9 @@ dependencies:
   '@astrojs/tailwind':
     specifier: ^5.0.0
     version: 5.0.0(astro@3.0.7)(tailwindcss@3.3.3)
+  '@microflash/rehype-figure':
+    specifier: ^2.1.0
+    version: 2.1.0
   '@tailwindcss/typography':
     specifier: ^0.5.9
     version: 0.5.9(tailwindcss@3.3.3)
@@ -50,12 +53,18 @@ dependencies:
   rehype-mermaidjs:
     specifier: ^2.0.0
     version: 2.0.0
+  rehype-picture:
+    specifier: ^5.0.0
+    version: 5.0.0
   rehype-slug:
     specifier: ^6.0.0
     version: 6.0.0
   rehype-toc:
     specifier: ^3.0.2
     version: 3.0.2
+  remark-rehype:
+    specifier: ^11.1.0
+    version: 11.1.0
   remark-toc:
     specifier: ^8.0.1
     version: 8.0.1
@@ -1970,6 +1979,15 @@ packages:
       - supports-color
     dev: false
 
+  /@microflash/rehype-figure@2.1.0:
+    resolution: {integrity: sha512-Ff1rrqjRYcmV9/7Qk8HM/mBpz9k5yzO8pgKfbI2hnN09sBQXoeOP4d9J419Mwk+LoMZlSfd4kgI92dFRtYBvUg==}
+    dependencies:
+      hast-util-whitespace: 3.0.0
+      hastscript: 9.0.0
+      unist-util-remove: 4.0.0
+      unist-util-visit: 5.0.0
+    dev: false
+
   /@nodelib/fs.scandir@2.1.5:
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
     engines: {node: '>= 8'}
@@ -2272,7 +2290,7 @@ packages:
   /@types/hast@3.0.0:
     resolution: {integrity: sha512-SoytUJRuf68HXYqcXicQIhCrLQjqeYU2anikr4G3p3Iz+OZO5QDQpDj++gv+RenHsnUBwNZ2dumBArF8VLSk2Q==}
     dependencies:
-      '@types/unist': 2.0.8
+      '@types/unist': 3.0.0
     dev: false
 
   /@types/json5@0.0.30:
@@ -2311,6 +2329,10 @@ packages:
 
   /@types/parse5@6.0.3:
     resolution: {integrity: sha512-SuT16Q1K51EAVPz1K29DJ/sXjhSQ0zjvsypYJ6tlwVsRV9jwW5Adq2ch8Dq8kDBCkYnELS7N7VNCSB5nC56t/g==}
+    dev: false
+
+  /@types/replace-ext@2.0.2:
+    resolution: {integrity: sha512-Lpicp+myvAIbBWYkZ61QYFRgvvaL02SKhMo+Ifb3FWoNuFe6n/Xz9LbPzvZKzQBBPCKPjZVW1fXiXcWpC5apuA==}
     dev: false
 
   /@types/resolve@1.17.1:
@@ -4247,6 +4269,16 @@ packages:
       space-separated-tokens: 2.0.2
     dev: false
 
+  /hastscript@9.0.0:
+    resolution: {integrity: sha512-jzaLBGavEDKHrc5EfFImKN7nZKKBdSLIdGvCwDZ9TfzbF2ffXiov8CKE445L2Z1Ek2t/m4SKQ2j6Ipv7NyUolw==}
+    dependencies:
+      '@types/hast': 3.0.0
+      comma-separated-tokens: 2.0.3
+      hast-util-parse-selector: 4.0.0
+      property-information: 6.3.0
+      space-separated-tokens: 2.0.2
+    dev: false
+
   /heap@0.2.7:
     resolution: {integrity: sha512-2bsegYkkHO+h/9MGbn6KWcE45cHZgPANo5LXF7EvWdT0yT2EguSVO1nDgU5c8+ZOPwp2vMNa7YFsJhVcDR9Sdg==}
 
@@ -6060,6 +6092,15 @@ packages:
       unified: 11.0.2
     dev: false
 
+  /rehype-picture@5.0.0:
+    resolution: {integrity: sha512-WyI2T7ck/AJe/b6T+MRKdNh2q8KOlsqJwF29koFQIfLhbX1nQc+jdD6YwkJVVVoMQlIsVZdqo+iQXXP3mcl8NQ==}
+    dependencies:
+      '@types/hast': 3.0.0
+      '@types/replace-ext': 2.0.2
+      replace-ext: 2.0.0
+      unist-util-visit: 5.0.0
+    dev: false
+
   /rehype-raw@6.1.1:
     resolution: {integrity: sha512-d6AKtisSRtDRX4aSPsJGTfnzrX2ZkHQLE5kiUuGOeEoLpbEulFF4hj0mLPbsa+7vmguDKOVVEQdHKDSwoaIDsQ==}
     dependencies:
@@ -6175,6 +6216,16 @@ packages:
       unified: 10.1.2
     dev: false
 
+  /remark-rehype@11.1.0:
+    resolution: {integrity: sha512-z3tJrAs2kIs1AqIIy6pzHmAHlF1hWQ+OdY4/hv+Wxe35EhyLKcajL33iUEn3ScxtFox9nUvRufR/Zre8Q08H/g==}
+    dependencies:
+      '@types/hast': 3.0.0
+      '@types/mdast': 4.0.0
+      mdast-util-to-hast: 13.0.2
+      unified: 11.0.2
+      vfile: 6.0.1
+    dev: false
+
   /remark-smartypants@2.0.0:
     resolution: {integrity: sha512-Rc0VDmr/yhnMQIz8n2ACYXlfw/P/XZev884QU1I5u+5DgJls32o97Vc1RbK3pfumLsJomS2yy8eT4Fxj/2MDVA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -6198,6 +6249,11 @@ packages:
       '@types/mdast': 4.0.0
       hast-util-whitespace: 3.0.0
       unist-util-visit: 5.0.0
+    dev: false
+
+  /replace-ext@2.0.0:
+    resolution: {integrity: sha512-UszKE5KVK6JvyD92nzMn9cDapSk6w/CaFZ96CnmDMUqH9oowfxF/ZjRITD25H4DnOQClLA4/j7jLGXXLVKxAug==}
+    engines: {node: '>= 10'}
     dev: false
 
   /require-from-string@2.0.2:
@@ -7064,6 +7120,14 @@ packages:
     dependencies:
       '@types/unist': 3.0.0
       unist-util-visit: 5.0.0
+    dev: false
+
+  /unist-util-remove@4.0.0:
+    resolution: {integrity: sha512-b4gokeGId57UVRX/eVKej5gXqGlc9+trkORhFJpu9raqZkZhU0zm8Doi05+HaiBsMEIJowL+2WtQ5ItjsngPXg==}
+    dependencies:
+      '@types/unist': 3.0.0
+      unist-util-is: 6.0.0
+      unist-util-visit-parents: 6.0.1
     dev: false
 
   /unist-util-select@4.0.3:

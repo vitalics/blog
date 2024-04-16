@@ -1,12 +1,12 @@
 ---
+import { Image } from "astro:assets";
 import type { CollectionEntry } from "astro:content";
+import Icon from "astro-icon";
 
 import AppLayout from "./BaseLayout.astro";
 import Pagination from "../components/Pagination.astro";
-import { Image } from "astro:assets";
 import authorImage from "../assets/images/me.jpeg";
 import { name, github } from "../data/socials";
-import Icon from "astro-icon";
 
 interface Props {
   post: CollectionEntry<"blog">;
@@ -119,6 +119,16 @@ const shareData = JSON.stringify({
   </article>
   <Pagination />
 </AppLayout>
+<script>
+  const images = Array.from(document.querySelectorAll("article>p>img"));
+  const parents = images.map((i) => i.parentElement);
+  for (let index = 0; index < parents.length; index++) {
+    const parent = parents[index];
+    if (parent) {
+      parent.outerHTML = images[index].outerHTML;
+    }
+  }
+</script>
 <script>
   const shareSupported =
     navigator.share && typeof navigator.share === "function";
