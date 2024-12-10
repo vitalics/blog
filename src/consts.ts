@@ -13,7 +13,7 @@ export type Link = {
 }
 
 export const SITE: Site = {
-  TITLE: 'Vitali Haradkou',
+  TITLE: 'Haradkou SDET',
   DESCRIPTION: 'Vitali Haradkou`s site - Senior SDET Engineer',
   EMAIL: 'vitalicset@gmail.com',
   NUM_POSTS_ON_HOMEPAGE: 5,
