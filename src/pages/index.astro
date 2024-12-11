@@ -20,7 +20,38 @@ const blog = (await getCollection('blog'))
   .slice(0, SITE.NUM_POSTS_ON_HOMEPAGE)
 ---
 
-<Layout title="Home" description={SITE.DESCRIPTION}>
+<Layout
+  title="Home"
+  description={SITE.DESCRIPTION}
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: Astro.site?.toString(),
+    name: SITE.TITLE,
+    description: SITE.DESCRIPTION,
+    isPartOf: {
+      '@type': 'WebSite',
+      url: Astro.site?.toString(),
+    },
+    primaryImageOfPage: {
+      '@type': 'ImageObject',
+      url: new URL('/static/1200x630.png', Astro.site).toString(),
+      width: 1200,
+      height: 630,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site?.toString(),
+        },
+      ],
+    },
+  }}
+>
   <Container class="flex flex-col gap-y-6">
     <section>
       <Card>

@@ -3,6 +3,7 @@ import BlogCard from '@/components/BlogCard.astro'
 import Breadcrumbs from '@/components/Breadcrumbs.astro'
 import Container from '@/components/Container.astro'
 import Layout from '@/layouts/Layout.astro'
+import { parseAuthors } from '@/lib/utils'
 import { Icon } from 'astro-icon/components'
 import { type CollectionEntry, getCollection } from 'astro:content'
 
@@ -35,6 +36,87 @@ export async function getStaticPaths() {
 <Layout
   title={`Posts tagged with "${tag}"`}
   description={`A collection of posts tagged with ${tag}.`}
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    url: Astro.url,
+    name: tag,
+    isPartOf: {
+      '@type': 'WebSite',
+      url: Astro.site,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site,
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Tags',
+          item: new URL('tags', Astro.site),
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: tag,
+          item: new URL(`tags/${tag}`, Astro.site),
+        },
+      ],
+    },
+    about: {
+      '@type': 'DefinedTerm',
+      name: tag,
+      url: new URL(`tags/${tag}`, Astro.site),
+    },
+    hasPart: await Promise.all(
+      posts.map(async (post) => {
+        let authors: Awaited<ReturnType<typeof parseAuthors>> = []
+        if (Array.isArray(post.data.authors) && post.data.authors.length > 0) {
+          authors = await parseAuthors(post.data.authors)
+        }
+        return {
+          '@type': 'BlogPosting',
+          headline: post.data.title,
+          url: new URL(`posts/${post.slug}`, Astro.site),
+          datePublished: post.data.date,
+          author: authors.map((author) => ({
+            '@type': 'Person',
+            name: author.name,
+            url: new URL(`authors/${author.slug}`, Astro.site),
+          })),
+        }
+      }),
+    ),
+    //   [
+    //   {
+    //     '@type': 'BlogPosting',
+    //     headline: 'The Future of AI in Everyday Life',
+    //     url: 'https://example.com/the-future-of-ai',
+    //     datePublished: '2024-12-11',
+    //     author: {
+    //       '@type': 'Person',
+    //       name: 'Jane Doe',
+    //       url: 'https://example.com/authors/jane-doe',
+    //     },
+    //   },
+    //   {
+    //     '@type': 'BlogPosting',
+    //     headline: 'How AI is Revolutionizing Healthcare',
+    //     url: 'https://example.com/ai-in-healthcare',
+    //     datePublished: '2024-11-25',
+    //     author: {
+    //       '@type': 'Person',
+    //       name: 'John Smith',
+    //       url: 'https://example.com/authors/john-smith',
+    //     },
+    //   },
+    // ],
+  }}
 >
   <Container class="flex flex-col gap-y-6">
     <Breadcrumbs

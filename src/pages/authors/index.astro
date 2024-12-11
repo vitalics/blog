@@ -8,7 +8,53 @@ import { getCollection } from 'astro:content'
 const authors = await getCollection('authors')
 ---
 
-<Layout title="Authors" description="A list of authors on this site.">
+<Layout
+  title="Authors"
+  description="A list of authors on this site."
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    url: Astro.url,
+    name: 'Authors',
+    description: 'A list of authors on this site.',
+    isPartOf: {
+      '@type': 'WebSite',
+      url: Astro.site,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site,
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Authors',
+          item: new URL('authors', Astro.site),
+        },
+      ],
+    },
+    hasPart: authors.map((author) => ({
+      '@type': 'Person',
+      name: author.data.name,
+      description: author.data.bio,
+      url: new URL(`/authors/${author.data.name}`, Astro.site),
+      image: author.data.avatar,
+      email: author.data.mail,
+      sameAs: [
+        author.data.website,
+        author.data.twitter,
+        author.data.linkedin,
+        author.data.github,
+        author.data.discord,
+      ].filter(Boolean),
+    })),
+  }}
+>
   <Container class="flex flex-col gap-y-6">
     <Breadcrumbs items={[{ label: 'Authors', icon: 'lucide:users' }]} />
     {

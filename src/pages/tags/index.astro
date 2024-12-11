@@ -14,7 +14,43 @@ const tags = blog
   .filter((tag, index, self) => self.indexOf(tag) === index)
 ---
 
-<Layout title="Tags" description="A list of all tags used in blog posts">
+<Layout
+  title="Tags"
+  description="A list of all tags used in blog posts"
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    url: Astro.url,
+    name: 'Tags',
+    description: 'A list of all tags used in blog posts',
+    isPartOf: {
+      '@type': 'WebSite',
+      url: Astro.site,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site,
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Tags',
+          item: new URL('tags', Astro.site),
+        },
+      ],
+    },
+    hasPart: tags.map((tag) => ({
+      '@type': 'DefinedTerm',
+      name: tag,
+      url: new URL(`tags/${tag ?? ''}`, Astro.site),
+    })),
+  }}
+>
   <Container class="flex flex-col gap-y-6">
     <Breadcrumbs items={[{ label: 'Tags', icon: 'lucide:tags' }]} />
 

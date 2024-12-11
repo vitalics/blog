@@ -6,6 +6,7 @@ import TableOfContents from '@/components/TableOfContents.astro'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { SITE } from '@/consts'
 import Layout from '@/layouts/Layout.astro'
 import { formatDate, parseAuthors, readingTime } from '@/lib/utils'
 import { Icon } from 'astro-icon/components'
@@ -57,6 +58,47 @@ const authors = await parseAuthors(post.data.authors ?? [])
   title={post.data.title}
   description={post.data.description}
   image={post.data.image?.src ?? '/static/1200x630.png'}
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: new URL(`blog/${Astro.params.slug}`, Astro.site).toString(),
+    name: post.data.title,
+    description: post.data.description,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: SITE.TITLE,
+      url: Astro.site,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site?.toString(),
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Blog',
+          item: new URL('blog', Astro.site).toString(),
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: post.data.title,
+          item: new URL(`blog/${post.slug}`, Astro.site),
+        },
+      ],
+    },
+    datePublished: post.data.date.toISOString(),
+    author: authors.map((author) => ({
+      '@type': 'Person',
+      name: author.name,
+      url: new URL(`authors/${author.slug}`, Astro.site).toString(),
+    })),
+  }}
 >
   <section
     class="grid grid-cols-[minmax(0px,1fr)_min(768px,100%)_minmax(0px,1fr)] gap-y-6 *:px-4"
