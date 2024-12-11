@@ -93,6 +93,7 @@ const authors = await parseAuthors(post.data.authors ?? [])
       ],
     },
     datePublished: post.data.date.toISOString(),
+    keywords: post.data.tags ?? [],
     author: authors.map((author) => ({
       '@type': 'Person',
       name: author.name,

@@ -23,7 +23,7 @@ const {
   mail,
 } = author.data
 
-const {Content } = await author.render()
+const { Content } = await author.render()
 
 const socialLinks: SocialLink[] = [
   website && { href: website, label: 'Website' },
@@ -57,7 +57,7 @@ const socialLinks: SocialLink[] = [
     <div class="flex flex-grow flex-col justify-between gap-y-4">
       <div>
         <div class="flex flex-wrap items-center gap-x-2">
-          <h3 class="text-lg font-semibold">{name}</h3>
+          <h3 transition:name={name} class="text-lg font-semibold">{name}</h3>
           {
             pronouns && (
               <span class="text-sm text-muted-foreground">({pronouns})</span>
@@ -67,8 +67,13 @@ const socialLinks: SocialLink[] = [
         <article
           class="prose prose-neutral col-start-2 max-w-none dark:prose-invert"
         >
-            {bio ? <p class="text-sm text-muted-foreground">{bio}</p>
-            : <Content />}
+          {
+            bio ? (
+              <p class="text-sm text-muted-foreground">{bio}</p>
+            ) : (
+              <Content />
+            )
+          }
         </article>
       </div>
       <SocialIcons links={socialLinks} />

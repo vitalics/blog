@@ -66,7 +66,7 @@ const authorPosts = allPosts
           <ul class="not-prose flex flex-col gap-4">
             {authorPosts.map((post) => (
               <li>
-                <BlogCard entry={post} />
+                <BlogCard transition:name={post.slug} entry={post} />
               </li>
             ))}
           </ul>

@@ -64,6 +64,9 @@ export default defineConfig({
     ],
     remarkPlugins: [remarkToc, remarkMath, remarkEmoji],
   },
+  prefetch: {
+    prefetchAll: true,
+  },
   server: {
     port: 1234,
     host: true,

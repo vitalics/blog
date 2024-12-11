@@ -116,7 +116,7 @@ export async function getStaticPaths() {
             <div>
               <ul class="not-prose flex flex-col gap-4">
                 <li>
-                  <BlogCard entry={post} />
+                  <BlogCard transition:name={post.id} entry={post} />
                 </li>
               </ul>
             </div>

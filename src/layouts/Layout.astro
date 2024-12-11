@@ -1,4 +1,6 @@
 ---
+import { ViewTransitions } from 'astro:transitions'
+
 import Footer from '@/components/Footer.astro'
 import Head from '@/components/Head.astro'
 import Header from '@/components/Header.astro'
@@ -33,6 +35,7 @@ const { title, description, image, structuredData } = Astro.props
         />
       )
     }
+    <ViewTransitions />
   </head>
   <body>
     <div

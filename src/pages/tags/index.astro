@@ -62,6 +62,7 @@ const tags = blog
             <Link
               href={`/tags/${tag}`}
               class={badgeVariants({ variant: 'secondary' })}
+              transition:name={tag}
             >
               <Icon name="lucide:hash" class="size-3 -translate-x-0.5" />
               {tag}
