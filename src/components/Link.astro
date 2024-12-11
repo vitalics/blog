@@ -1,47 +1,27 @@
 ---
-import type { HTMLAttributes } from "astro/types";
+import { cn } from '@/lib/utils'
 
-interface Props extends HTMLAttributes<"a"> {
-  disabled?: boolean;
+type Props = {
+  href: string
+  external?: boolean
+  class?: string
+  underline?: boolean
+  [key: string]: any
 }
-const { href, disabled, ...props } = Astro.props;
-let isActive: boolean;
 
-if (!href) {
-  isActive = false;
-} else if (href === "/") {
-  isActive = href === Astro.url.pathname;
-} else {
-  isActive = Astro.url.pathname.includes(
-    typeof href === "string" ? href : href.href
-  );
-}
+const { href, external, class: className, underline, ...rest } = Astro.props
 ---
 
-<span class:list={[{ "cursor-not-allowed": disabled }]}>
-  <a
-    data-disabled={disabled}
-    data-active={isActive}
-    class:list={[
-      "font-semibold text-sm block py-2.5 px-3 dark:hover:bg-zinc-700/50 hover:bg-zinc-100",
-      { "dark:text-zinc-200 text-zinc-600": !isActive },
-      { "dark:text-teal-400 text-blue-600": isActive },
-      {
-        "pointer-events-none opacity-50": disabled,
-      },
-    ]}
-    aria-disabled={disabled}
-    aria-current={isActive ? "page" : undefined}
-    href={href}
-    {...props}
-  >
-    <slot />
-  </a>
-</span>
-<style>
-  a[aria-disabled="true"] {
-    pointer-events: none;
-    text-decoration: none;
-    cursor: not-allowed;
-  }
-</style>
+<a
+  href={href}
+  target={external ? '_blank' : '_self'}
+  class={cn(
+    'inline-block transition-colors duration-300 ease-in-out',
+    underline &&
+      'underline decoration-muted-foreground underline-offset-[3px] hover:decoration-foreground',
+    className,
+  )}
+  {...rest}
+>
+  <slot />
+</a>

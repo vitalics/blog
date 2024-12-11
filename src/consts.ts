@@ -1,12 +1,33 @@
-// Place any global data in this file.
-// You can import this data from anywhere in your site by using the `import` keyword.
+export type Site = {
+  TITLE: string
+  DESCRIPTION: string
+  EMAIL: string
+  NUM_POSTS_ON_HOMEPAGE: number
+  POSTS_PER_PAGE: number
+}
 
-export const SITE_TITLE = 'Vitalics Blog';
-export const SITE_DESCRIPTION = 'Welcome to my vitalics blog!';
+export type Link = {
+  href: string
+  label: string
+}
 
-export const SOCIALS = [{
-  github: {
-    url: 'https://github.com/vitalics',
-    srOnly: 'Go to vitalics GitHub',
-  }
-}];
+export const SITE: Site = {
+  TITLE: 'Haradkou SDET',
+  DESCRIPTION: 'Vitali Haradkou`s site - Senior SDET Engineer',
+  EMAIL: 'vitalicset@gmail.com',
+  NUM_POSTS_ON_HOMEPAGE: 5,
+  POSTS_PER_PAGE: 5,
+}
+
+export const NAV_LINKS: Link[] = [
+  { href: '/blog', label: 'blog' },
+  { href: '/authors', label: 'authors' },
+  { href: '/projects', label: 'projects' },
+  { href: '/tags', label: 'tags' },
+]
+
+export const SOCIAL_LINKS: Link[] = [
+  { href: 'https://github.com/vitalics', label: 'GitHub' },
+  { href: 'vitalicset@gmail.com', label: 'Email' },
+  { href: '/rss.xml', label: 'RSS' },
+]

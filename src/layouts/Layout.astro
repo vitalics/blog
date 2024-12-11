@@ -1,0 +1,51 @@
+---
+import { ViewTransitions } from 'astro:transitions'
+
+import Footer from '@/components/Footer.astro'
+import Head from '@/components/Head.astro'
+import Header from '@/components/Header.astro'
+import Posthog from '@/components/analytics/Posthog.astro'
+import { SITE } from '@/consts'
+
+type Props = {
+  title: string
+  description: string
+  image?: string
+  structuredData?: Record<string, unknown>
+}
+
+const { title, description, image, structuredData } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <Head
+      title={`${title} | ${SITE.TITLE}`}
+      description={description}
+      image={image}
+    />
+    <Posthog />
+    {
+      structuredData && (
+        <script
+          is:inline
+          type="application/ld+json"
+          set:html={JSON.stringify(structuredData, null, 2)}
+        />
+      )
+    }
+    <ViewTransitions />
+  </head>
+  <body>
+    <div
+      class="box-border flex h-fit min-h-screen flex-col gap-y-6 font-sans antialiased"
+    >
+      <Header />
+      <main class="flex-grow">
+        <slot />
+      </main>
+      <Footer />
+    </div>
+  </body>
+</html>

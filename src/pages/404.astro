@@ -1,20 +1,37 @@
 ---
-import AppLayout from "../layouts/BaseLayout.astro";
-const title = "Not found";
-const description = "Sorry, the page you are looking for does not exist.";
+import Breadcrumbs from '@/components/Breadcrumbs.astro'
+import Container from '@/components/Container.astro'
+import Link from '@/components/Link.astro'
+import { buttonVariants } from '@/components/ui/button'
+import { SITE } from '@/consts'
+import Layout from '@/layouts/Layout.astro'
+import { cn } from '@/lib/utils'
 ---
 
-<AppLayout title={title} description={description}>
-  <div class="flex flex-col gap-4 items-center w-full h-full">
-    <p
-      class="text-xl dark:text-white font-medium text-zinc-900 text-center my-4"
+<Layout title="404" description={SITE.DESCRIPTION}>
+  <Container class="flex grow flex-col gap-y-6">
+    <Breadcrumbs items={[{ label: '???', icon: 'lucide:circle-help' }]} />
+
+    <section
+      class="flex flex-col items-center justify-center gap-y-4 text-center"
     >
-      We couldn't find the page you were looking for ...
-    </p>
-    <a
-      href="/"
-      class="px-6 py-2 hover:bg-zinc-900 hover:text-white dark:border-white border rounded-xl dark:text-zinc-200 dark:hover:bg-white border-zinc-900 dark:hover:text-zinc-900 transition-colors"
-      >Take me home
-    </a>
-  </div>
-</AppLayout>
+      <div class="max-w-md">
+        <h1 class="mb-4 text-3xl font-bold">404: Page not found</h1>
+        <p class="prose prose-neutral dark:prose-invert">
+          Oops! The page you're looking for doesn't exist.
+        </p>
+      </div>
+      <Link
+        href="/"
+        class={cn(
+          buttonVariants({ variant: 'outline' }),
+          'flex gap-x-1.5 group',
+        )}
+      >
+        <span class="transition-transform group-hover:-translate-x-1"
+          >&larr;</span
+        > Go to home page
+      </Link>
+    </section>
+  </Container>
+</Layout>

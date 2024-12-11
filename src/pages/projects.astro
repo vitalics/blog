@@ -1,48 +1,30 @@
 ---
-import AppLayout from "../layouts/BaseLayout.astro";
-import Header from "../components/Header.astro";
-import data, { Project } from "../data/projects";
-import ProjectCard from "../components/ProjectCard.astro";
+import Breadcrumbs from '@/components/Breadcrumbs.astro'
+import Container from '@/components/Container.astro'
+import ProjectCard from '@/components/ProjectCard.astro'
+import { SITE } from '@/consts'
+import Layout from '@/layouts/Layout.astro'
+import { getCollection } from 'astro:content'
 
-// const openSourceContributions = data as Project[];
-
-// openSourceContributions.sort((a, b) => {
-//   if (a.role === "maintainer" && b.role !== "maintainer") {
-//     return -1;
-//   }
-//   if (a.role === "maintainer" && b.role === "maintainer") {
-//     return a.stars > b.stars ? -1 : 1;
-//   }
-//   if (a.role === "author" && b.role === "author") {
-//     return a.stars > b.stars ? -1 : 1;
-//   }
-//   if (a.role === "author" && b.role !== "author") {
-//     return -1;
-//   }
-//   return 0;
-// });
+const projects = await getCollection('projects')
 ---
 
-<AppLayout title="Projects | Kevin Zuniga Cuellar">
-  <Header title="Open Source" />
-  <p
-    class="max-w-prose mb-10 font-normal dark:text-zinc-400 text-zinc-600 leading-relaxed"
-  >
-    I love open source and I have been contributing to different projects for
-    the some time. Here is a list of projects that I have contributed to and
-    authored.
-  </p>
-  <ul class="grid grid-cols-2 gap-8">
-    {
-      data.map((project) => (
-        <ProjectCard
-          name={project.name}
-          description={project.description}
-          role={project.role}
-          url={project.url}
-          languages={project.languages}
-        />
-      ))
-    }
-  </ul>
-</AppLayout>
+<Layout title="About" description={SITE.DESCRIPTION}>
+  <Container class="flex flex-col gap-y-6">
+    <Breadcrumbs items={[{ label: 'Projects', icon: 'lucide:info' }]} />
+
+    <section>
+      <div class="min-w-full">
+        <h1 class="mb-4 text-3xl font-bold">Some more about site</h1>
+        <p class="prose prose-neutral mb-8 dark:prose-invert">
+          {SITE.DESCRIPTION}
+        </p>
+
+        <h2 class="mb-4 text-2xl font-semibold">Our Projects</h2>
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {projects.map((project) => <ProjectCard project={project} />)}
+        </div>
+      </div>
+    </section>
+  </Container>
+</Layout>

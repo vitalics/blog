@@ -1,0 +1,128 @@
+---
+import BlogCard from '@/components/BlogCard.astro'
+import Breadcrumbs from '@/components/Breadcrumbs.astro'
+import Container from '@/components/Container.astro'
+import Layout from '@/layouts/Layout.astro'
+import { parseAuthors } from '@/lib/utils'
+import { Icon } from 'astro-icon/components'
+import { type CollectionEntry, getCollection } from 'astro:content'
+
+type BlogPost = CollectionEntry<'blog'>
+
+type Props = {
+  tag: string
+  posts: BlogPost[]
+}
+
+const { tag, posts } = Astro.props
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog')
+  const tags = posts.flatMap((post) => post.data.tags || [])
+  const uniqueTags = Array.from(
+    new Set(tags.filter((tag): tag is string => typeof tag === 'string')),
+  )
+
+  return uniqueTags.map((tag) => ({
+    params: { slug: tag },
+    props: {
+      tag,
+      posts: posts.filter((post) => post.data.tags?.includes(tag)),
+    },
+  }))
+}
+---
+
+<Layout
+  title={`Posts tagged with "${tag}"`}
+  description={`A collection of posts tagged with ${tag}.`}
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    url: Astro.url,
+    name: tag,
+    isPartOf: {
+      '@type': 'WebSite',
+      url: Astro.site,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site,
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Tags',
+          item: new URL('tags', Astro.site),
+        },
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: tag,
+          item: new URL(`tags/${tag}`, Astro.site),
+        },
+      ],
+    },
+    about: {
+      '@type': 'DefinedTerm',
+      name: tag,
+      url: new URL(`tags/${tag}`, Astro.site),
+    },
+    hasPart: await Promise.all(
+      posts.map(async (post) => {
+        let authors: Awaited<ReturnType<typeof parseAuthors>> = []
+        if (Array.isArray(post.data.authors) && post.data.authors.length > 0) {
+          authors = await parseAuthors(post.data.authors)
+        }
+        return {
+          '@type': 'BlogPosting',
+          headline: post.data.title,
+          url: new URL(`posts/${post.slug}`, Astro.site),
+          datePublished: post.data.date,
+          author: authors.map((author) => ({
+            '@type': 'Person',
+            name: author.name,
+            url: new URL(`authors/${author.slug}`, Astro.site),
+          })),
+        }
+      }),
+    ),
+  }}
+>
+  <Container class="flex flex-col gap-y-6">
+    <Breadcrumbs
+      items={[
+        { href: '/tags', label: 'Tags', icon: 'lucide:tags' },
+        { label: tag, icon: 'lucide:tag' },
+      ]}
+    />
+    <div class="flex flex-wrap items-center gap-2">
+      <h1 class="text-3xl font-semibold">Posts tagged with</h1>
+      <span
+        class="flex items-center gap-x-1 rounded-full bg-secondary px-4 py-2 text-2xl font-semibold"
+      >
+        <Icon name="lucide:hash" class="size-6 -translate-x-0.5" />{tag}
+      </span>
+    </div>
+    <div class="flex flex-col gap-y-4">
+      {
+        posts.map((post) => (
+          <section class="flex flex-col gap-y-4">
+            <div>
+              <ul class="not-prose flex flex-col gap-4">
+                <li>
+                  <BlogCard transition:name={post.id} entry={post} />
+                </li>
+              </ul>
+            </div>
+          </section>
+        ))
+      }
+    </div>
+  </Container>
+</Layout>

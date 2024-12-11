@@ -1,69 +1,109 @@
 ---
-import { Image } from "astro:assets";
+import BlogCard from '@/components/BlogCard.astro'
+import Container from '@/components/Container.astro'
+import Link from '@/components/Link.astro'
+import { buttonVariants } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { SITE } from '@/consts'
+import Layout from '@/layouts/Layout.astro'
+import { getCollection } from 'astro:content'
 
-import BaseLayout from "../layouts/BaseLayout.astro";
-import { name } from "../data/socials";
-import authorImage from "../assets/images/me.jpeg";
-import technologies from "../data/technnologies";
-import Skill from "../components/Skill.astro";
-import Link from "../components/Link.astro";
+const blog = (await getCollection('blog'))
+  .filter((post) => !post.data.draft)
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, SITE.NUM_POSTS_ON_HOMEPAGE)
 ---
 
-<BaseLayout>
-  <header class="sm:flex sm:items-center sm:justify-between">
-    <Image
-      src={authorImage}
-      class="rounded-full aspect-square w-40 overflow-hidden inline-flex"
-      alt="Image of the author"
-      loading="eager"
-      width={320}
-      height={320}
-    />
-    <div class="mt-8 max-w-lg 2xl:max-w-xl sm:my-0 sm:order-first">
-      <h1
-        class="mb-2 text-3xl font-bold tracking-tight dark:text-white text-zinc-900 sm:text-4xl"
-      >
-        {name}
-      </h1>
-      <p class="mb-4 dark:text-zinc-300 text-zinc-700">
-        Software engineer in Test(SDET).
-        <br />
-        <a
-          class="dark:text-blue-400 text-blue-600 hover:underline block"
-          target="_blank"
-          rel="noopener noreferrer"
-          href="https://www.credly.com/badges/b0b8301c-faf3-4048-9b2f-e459db219878/linked_in_profile"
-          >Certified Node.js Application Developer(JSNAD).</a
+<Layout
+  title="Home"
+  description={SITE.DESCRIPTION}
+  structuredData={{
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    url: Astro.site?.toString(),
+    name: SITE.TITLE,
+    description: SITE.DESCRIPTION,
+    isPartOf: {
+      '@type': 'WebSite',
+      url: Astro.site?.toString(),
+    },
+    primaryImageOfPage: {
+      '@type': 'ImageObject',
+      url: new URL('/static/1200x630.png', Astro.site).toString(),
+      width: 1200,
+      height: 630,
+    },
+    breadcrumb: {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: Astro.site?.toString(),
+        },
+      ],
+    },
+  }}
+>
+  <Container class="flex flex-col gap-y-6">
+    <section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-3xl">Vitali Haradkou</CardTitle>
+          <CardDescription>
+            <p>Software engineer in Test(SDET).</p>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p class="mb-2 text-sm text-muted-foreground">
+            <Link
+              href="https://www.credly.com/badges/b0b8301c-faf3-4048-9b2f-e459db219878/linked_in_profile"
+              class="text-foreground"
+              external
+              underline
+              >Certified Node.js Application Developer(JSNAD).
+            </Link>
+          </p>
+          <p class="text-sm text-muted-foreground">
+            I am a SDET enginner and use typescript, node.js to solve every-day
+            tasks!
+          </p>
+          <p class="text-sm text-muted-foreground">
+            I build some tools and experiment with new technologies/libraries
+            and share in web!
+          </p>
+        </CardContent>
+      </Card>
+    </section>
+    <section class="flex flex-col gap-y-4">
+      <h2 class="text-2xl font-bold">Latest posts</h2>
+      <ul class="not-prose flex flex-col gap-y-4">
+        {
+          blog.map((post) => (
+            <li>
+              <BlogCard entry={post} />
+            </li>
+          ))
+        }
+      </ul>
+      <div class="flex justify-center">
+        <Link
+          href="/blog"
+          class={buttonVariants({ variant: 'ghost' }) + ' group'}
         >
-      </p>
-      <p
-        class="max-w-prose font-normal dark:text-zinc-400 text-zinc-600 sm:max-w-sm md:max-w-xl leading-relaxed"
-      >
-        I am a SDET enginner and use typescript, node.js to solve every-day
-        tasks! In my free time, I build some tools and experiment with new
-        technologies/libraries.
-      </p>
-    </div>
-  </header>
-  <section class="mt-10 sm:mt-14" aria-labelledby="section-title">
-    <h2
-      class="dark:text-zinc-300 text-zinc-700 mb-4 text-2xl font-bold tracking-tight"
-      id="section-title"
-    >
-      Favorite technologies/tools
-    </h2>
-    <p
-      class="max-w-prose mb-8 font-normal dark:text-zinc-400 text-zinc-600 leading-relaxed"
-    >
-      I love exploring new libraries, programing languages and frameworks. Here
-      is a list of technologies that I have worked with.
-    </p>
-    <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {
-        technologies.map((tech) => (
-          <Skill text={tech.text} inline={tech.inline} logo={tech.logo} />
-        ))
-      }
-    </ul>
-  </section>
-</BaseLayout>
+          See all posts <span
+            class="ml-1.5 transition-transform group-hover:translate-x-1"
+            >&rarr;</span
+          >
+        </Link>
+      </div>
+    </section>
+  </Container>
+</Layout>
