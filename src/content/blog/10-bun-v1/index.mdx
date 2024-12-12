@@ -1,14 +1,14 @@
 ---
-title: "Bun: Is it fast for test automation?"
+title: 'Bun: Is it fast for test automation?'
 description: "Is Bunjs runtime faster than package manager scripts? Let's check it out and compare bun vs pnpm vs yarn vs npm!"
 date: 2023-09-10
-image: "./10-bun-hero.webp"
+image: './10-bun-hero.webp'
 tags: ['comparison', 'bun', 'nodejs', 'performance']
 authors: ['vitalics']
 telegram_channel: 'haradkou_sdet'
 ---
 
-import { YouTube } from 'astro-embed';
+import { YouTube } from 'astro-embed'
 
 ## What is Bun?
 
@@ -47,23 +47,23 @@ curl -fsSL https://bun.sh/install | bash
 
 The test is simple. We will run both `headless` and `headful` modes
 
-<YouTube id="https://youtu.be/-69-MD8Essg" />
-> Video 1. Repesentation of headless mode.
+<YouTube id="https://youtu.be/-69-MD8Essg" />> Video 1. Repesentation of headless
+mode.
 
 ### Round 1. Headful mode
 
 playwright Configuration will be looks like this:
 
 ```ts title="playwright.config.ts" showLineNumbers caption="playwright config" {12}
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   // Look for test files in the "tests" directory, relative to this configuration file.
-  testDir: "tests",
+  testDir: 'tests',
   workers: 1,
   use: {
     // Base URL to use in actions like `await page.goto('/')`.
-    baseURL: "https://google.com",
+    baseURL: 'https://google.com',
     launchOptions: {
       // headful mode
       headless: false,
@@ -72,22 +72,22 @@ export default defineConfig({
   // Configure projects for major browsers.
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
-});
+})
 ```
 
 And Test file will be looks like:
 
 ```ts title="tests/some.test.ts" caption="simple playwright test" showLineNumbers
-import { test, expect } from "@playwright/test";
+import { test, expect } from '@playwright/test'
 
-test("should work", async ({ page }) => {
+test('should work', async ({ page }) => {
   // opens baseURL
-  await page.goto("/");
-});
+  await page.goto('/')
+})
 ```
 
 Let's see some results:
@@ -112,15 +112,15 @@ Very impressive. Bun is about `12%` faster than pnpm in execution time. Npm is a
 Same test file, but let's update configuration in `playwright.config.ts` file
 
 ```ts title="playwright.config.ts" caption="updated playwright config" showLineNumbers {12}
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   // Look for test files in the "tests" directory, relative to this configuration file.
-  testDir: "tests",
+  testDir: 'tests',
   workers: 1,
   use: {
     // Base URL to use in actions like `await page.goto('/')`.
-    baseURL: "https://google.com",
+    baseURL: 'https://google.com',
     launchOptions: {
       // headless mode
       headless: true,
@@ -129,11 +129,11 @@ export default defineConfig({
   // Configure projects for major browsers.
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
-});
+})
 ```
 
 | Launch # | [Bun](https://bun.sh/) | [pnpm](https://pnpm.io/) | [yarn](https://yarnpkg.com/) | [npm](https://docs.npmjs.com/) |

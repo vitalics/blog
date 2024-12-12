@@ -1,8 +1,8 @@
 ---
-title: "k6: How to test you signalR websockets"
+title: 'k6: How to test you signalR websockets'
 description: At this article I'll share how to load test backend which was written using signalR library.
 date: 2023-09-08
-image: "./09-k6-websockets.webp"
+image: './09-k6-websockets.webp'
 tags: ['load testing', 'performance', 'k6', 'javascript']
 authors: ['vitalics']
 telegram_channel: 'haradkou_sdet'
@@ -21,6 +21,7 @@ WebSockets is a internet communication protocol between client and server.
 unlike HTTP - websockets are bi-directional internet protocol, unlike HTTP it starts from `ws://` or `wss://`. It is a stateful protocol, which means the connection between client and server will keep alive until it is terminated by either party (client or server).
 
 ![how ws works](./09-websocket-works.webp)
+
 > Image 1. Websocket connection schema
 
 ## Where used websockets?
@@ -90,19 +91,18 @@ import check from 'k6/check'
 import http from 'k6/http'
 import ws from 'k6/ws'
 
-
 // ESSENTIAL:
-export default function(){
-  const loginResponse = http.post(`{BASE_URL}/account/login`);
+export default function () {
+  const loginResponse = http.post(`{BASE_URL}/account/login`)
 
   check(loginResponse, {
     'status is 200': () => loginResponse.status === 200,
   })
 
   const token = loginResponse.json('accessToken')
-  let data = [];
+  let data = []
   let socket = null
-  const wsResponse = ws.connect(`{BASE_URL}/account/ws/account`, socket => {
+  const wsResponse = ws.connect(`{BASE_URL}/account/ws/account`, (socket) => {
     socket = socket
     socket.on('open', () => {
       // ESSENTIAL
@@ -112,23 +112,23 @@ export default function(){
     socket.on('message', (data) => {
       // data example: [{field1: "value 1"}]
       const msg = JSON.parse(msg) // backend returns objects as string
-      data = msg;
+      data = msg
     })
   })
 
-  const updateResponse = http.post(`{BASE_URL}/account/update`);
+  const updateResponse = http.post(`{BASE_URL}/account/update`)
 
   check(updateResponse, {
     'status is 200': () => updateResponse.status === 200,
   })
 
   check(data, {
-    "0 element should be 'value 1'": () => data[0].field1 === 'value 1'
+    "0 element should be 'value 1'": () => data[0].field1 === 'value 1',
   })
 
   // end test. close socket.
   // otherwise test will never ends
-  socket.close();
+  socket.close()
 }
 ```
 
@@ -147,6 +147,7 @@ k6 account.test.js
 And the report will be looks like screen below:
 
 ![result](./09-websocket-result.png)
+
 > Image 2. execution result. See at `ws_*` line.
 
 That's it! See you soon!

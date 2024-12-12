@@ -2,7 +2,7 @@
 title: It's done! Rust-like API in your JavaScript code
 description: Library witch handle undefined behavior
 date: 2023-08-08
-image: "./06-rslike-hero.webp"
+image: './06-rslike-hero.webp'
 tags: ['library', 'rslike']
 authors: ['vitalics']
 telegram_channel: 'haradkou_sdet'
@@ -23,10 +23,10 @@ npm i `@rslike/std` and here you go!
 In your JS/TS file you can writes something like this:
 
 ```ts title="example.ts" showLineNumbers caption="example of usage"
-import {Ok, Some, Err, None} from '@rslike/std';
+import { Ok, Some, Err, None } from '@rslike/std'
 
-const a = Ok(123);
-const mapped = a.map(res => String(res));
+const a = Ok(123)
+const mapped = a.map((res) => String(res))
 
 console.log(mapped) // "123"
 ```

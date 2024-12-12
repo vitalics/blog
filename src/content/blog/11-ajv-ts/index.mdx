@@ -1,8 +1,8 @@
 ---
-title: "Zod is dead. Long live ajv-ts!"
-description: "Why ajv-ts is a future! And how it solves problems on the current project?"
+title: 'Zod is dead. Long live ajv-ts!'
+description: 'Why ajv-ts is a future! And how it solves problems on the current project?'
 date: 2023-09-29
-image: "./11-zod-hero.webp"
+image: './11-zod-hero.webp'
 tags: ['json-schema', 'ajv', 'zod', 'ajv-ts', 'library']
 authors: ['vitalics']
 telegram_channel: 'haradkou_sdet'
@@ -17,16 +17,16 @@ I want examples! Okay, here you are.
 Let's imagine that we want to create an object `User` with email and password fields. Both are them - required.
 
 ```ts title="example.ts" showLineNumbers caption="example of using zod"
-import z from "zod";
+import z from 'zod'
 
 const UserSchema = z.object({
   username: z.string(),
   password: z.string(),
-});
-type User = z.infer<typeof UserSchema>; // {username: string, password: string}
+})
+type User = z.infer<typeof UserSchema> // {username: string, password: string}
 
-const admin = UserSchema.parse({ username: "admin", password: "admin" }); // OK
-const guesstWrong = UserSchema.parse({ username: "admin", password: 123 }); // Error. Password is not a string
+const admin = UserSchema.parse({ username: 'admin', password: 'admin' }) // OK
+const guesstWrong = UserSchema.parse({ username: 'admin', password: 123 }) // Error. Password is not a string
 ```
 
 Zod will handle incoming arguments into the `parse` function and throw if argument not match the schema
@@ -43,11 +43,11 @@ First of all, I define the base type:
 
 ```ts title="types.ts" caption="base type"
 export type BaseSchema = Record<string, unknown> & {
-  type?: string;
-  $comment?: string;
-  description?: string;
+  type?: string
+  $comment?: string
+  description?: string
   // ...etc.
-};
+}
 ```
 
 According on [JSON-schema](https://json-schema.org/) specification - I define primitives(Number, String, Boolean, Null, Const) and complex(Object, Array, Enum, Union, Intersection) types
@@ -56,18 +56,18 @@ Example of the Number schema:
 
 ```ts title="types.ts" caption="number schema"
 export type NumberSchema = BaseSchema & {
-  type: "number" | "int";
-  format?: "int32" | "double";
-  min?: number;
-  max?: number;
+  type: 'number' | 'int'
+  format?: 'int32' | 'double'
+  min?: number
+  max?: number
   // ...etc number params
-};
+}
 ```
 
 And Also I define `AnySchema` which takes all possible schema types:
 
 ```ts title="types.ts"
-export type AnySchema = NumberSchema | StringSchema | BooleanSchema; // ...etc
+export type AnySchema = NumberSchema | StringSchema | BooleanSchema // ...etc
 ```
 
 ## Attempt 2. Builder
@@ -77,7 +77,7 @@ The next step is to define Builder. But some methods should be inherited. So I m
 It has next signature
 
 ```ts title="builder.ts" showLineNumbers caption="schema builder signature"
-import { AnySchema } from "./types";
+import { AnySchema } from './types'
 abstract class SchemaBuilder<Input, Schema extends AnySchema, Output = Input> {
   constructor(readonly schema: Schema) {
     // schema is a JSON-schema notation
@@ -86,11 +86,11 @@ abstract class SchemaBuilder<Input, Schema extends AnySchema, Output = Input> {
     // logic here
   }
   parse(input: unknown): Output {
-    const { success, data, error } = this.safeParse(input);
+    const { success, data, error } = this.safeParse(input)
     if (data && success) {
-      return data;
+      return data
     }
-    throw error;
+    throw error
   }
   // rest methods
 }
@@ -113,17 +113,17 @@ Let me show you an example:
 abstract class SchemaBuilder<Input, Schema extends AnySchema, Output = Input> {
   preprocess<Schema extends SchemaBuilder<any, any, any>>(
     fn: (x: unknown) => unknown,
-    schema: Schema
+    schema: Schema,
   ): Schema {
-    this.preprocessFns.push({ fn, schema });
-    return this;
+    this.preprocessFns.push({ fn, schema })
+    return this
   }
   postprocess<Schema extends SchemaBuilder<any, any, any>>(
     fn: (x: unknown) => unknown,
-    schema: Schema
+    schema: Schema,
   ): Schema {
-    this.postprocessFns.push({ fn, schema });
-    return this;
+    this.postprocessFns.push({ fn, schema })
+    return this
   }
   // rest methods
 }
@@ -135,12 +135,12 @@ How it will used:
 const MySchema = s.string().preprocess((x) => {
   //If we got the date - transform it into "ISO" format
   if (x instanceof Date) {
-    return x.toISOString();
+    return x.toISOString()
   }
-  return x;
-});
+  return x
+})
 
-const a = MySchema.parse(new Date()); // returns "2023-09-27T12:25:05.870Z"
+const a = MySchema.parse(new Date()) // returns "2023-09-27T12:25:05.870Z"
 ```
 
 And the Same for `postprocess`. The idea is simple. the `parse` method returns the `Output` generic.
@@ -151,10 +151,10 @@ Example with a `NumberSchemaBuilder`
 ```ts title="builder.ts" caption="number schema deinition" showLineNumbers{37}
 class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   constructor() {
-    super({ type: "number" });
+    super({ type: 'number' })
   }
-  format(type: "int32" | "double") {
-    this.schema.format = type;
+  format(type: 'int32' | 'double') {
+    this.schema.format = type
   }
 }
 ```
@@ -169,7 +169,7 @@ Bonus: Define the `number` function:
 
 ```ts title="builder.ts" caption="aggregator function in zod-like format"
 export function number() {
-  return new NumberSchema();
+  return new NumberSchema()
 }
 ```
 
@@ -186,8 +186,8 @@ Let's switch it up to `SchemaBuilder` again and define a "tricky" hack!
 
 ```ts title="builder.ts" showLineNumbers caption="input and output definition"
 abstract class SchemaBuilder<Input, Schema extends AnySchema, Output = Input> {
-  _input: Input;
-  _output: Output;
+  _input: Input
+  _output: Output
   // ...other methods
 }
 ```
@@ -195,14 +195,14 @@ abstract class SchemaBuilder<Input, Schema extends AnySchema, Output = Input> {
 The `_input` and `_output` is always have "undefined", but we will use them to infering parameters.
 
 ```ts title="builder.ts" caption="infer type declaration"
-export type Infer<S extends SchemaBuilder<any, any, any>> = S["_output"];
+export type Infer<S extends SchemaBuilder<any, any, any>> = S['_output']
 ```
 
 Now we can check that this is works:
 
 ```ts title="example.ts" caption="example usage"
 const MyNumber = s.number()
-type Infered = Infer<typeof MyNumber>; // number
+type Infered = Infer<typeof MyNumber> // number
 ```
 
 Gotha! BTW `zod` works in the same way. I cannot find any other solution.
@@ -211,22 +211,22 @@ Gotha! BTW `zod` works in the same way. I cannot find any other solution.
 
 ```ts title="builder.ts" caption="full schema builder source code" showLineNumbers
 abstract class SchemaBuilder<Input, Schema extends AnySchema, Output = Input> {
-  _input: Input;
-  _output: Output;
+  _input: Input
+  _output: Output
   ajv: Ajv // ajv Instance, used for validation
-  safeParse(input: unknown);
-  parse(input: unknown);
+  safeParse(input: unknown)
+  parse(input: unknown)
 }
 class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   constructor() {
-    super({ type: "number" });
+    super({ type: 'number' })
   }
-  format(type: "int32" | "double") {
-    this.schema.format = type;
+  format(type: 'int32' | 'double') {
+    this.schema.format = type
   }
 }
 export function number() {
-  return new NumberSchema();
+  return new NumberSchema()
 }
 ```
 
@@ -239,14 +239,19 @@ The library has the same API as `Zod`. Now any team in the project can simply de
 ```ts title="user.schema.ts" showLineNumbers caption="ajv-ts example usage" {10}
 import s from 'ajv-ts'
 
-export const LoginUserRequestData = s.object({
-  email: s.string().format('email'),
-  password: s.string()
-}).strict().required().meta({
-description: 'request data for "/login" endpoint'})
+export const LoginUserRequestData = s
+  .object({
+    email: s.string().format('email'),
+    password: s.string(),
+  })
+  .strict()
+  .required()
+  .meta({
+    description: 'request data for "/login" endpoint',
+  })
 
 export default {
-  "User Login Schema": LoginUserRequestData.schema
+  'User Login Schema': LoginUserRequestData.schema,
 }
 ```
 
@@ -260,7 +265,7 @@ await fs.writeFile('swagger-like.json', JSON.stringify(schemaDefs, null, 2))
 
 The output will be:
 
-``` json title="swagger-like.json" showLineNumbers {2}
+```json title="swagger-like.json" showLineNumbers {2}
 {
   "User Login Schema": {
     "type": "object",

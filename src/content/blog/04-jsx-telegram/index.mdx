@@ -116,7 +116,7 @@ And Render function reuse default fmt function
 
 ```tsx
 export default function render(node: VNode | JSX.Element) {
-  let text = toString(node) // html-like string
+  const text = toString(node) // html-like string
   return fmt(text) // returns [raw text, {modifications}]
 }
 ```
@@ -128,7 +128,7 @@ That's why If user would like to use default components - he needs to use `rest/
 Code
 
 ```tsx title="example.ts" caption="Example os usage"
-import { Fragment, h } from 'preact'
+import { Fragment } from 'preact'
 import { Telegraf } from 'telegraf'
 
 import { Bold, render } from '@tlgr/fmt/default'

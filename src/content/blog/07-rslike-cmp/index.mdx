@@ -1,8 +1,8 @@
 ---
-title: "@rslike/cmp: compare your structures like a pro"
+title: '@rslike/cmp: compare your structures like a pro'
 description: At this article I'll share about comparing your data structures
 date: 2023-08-23
-image: "./07-rslike-cmp-hero.webp"
+image: './07-rslike-cmp-hero.webp'
 tags: ['library', 'rslike', 'update']
 authors: ['vitalics']
 telegram_channel: 'haradkou_sdet'
@@ -31,48 +31,48 @@ I highly recommend to install `@rslike/std` package too, since if you would like
 Usage:
 
 ```ts title="node.ts" showLineNumbers caption="example of usage"
-import {type Ord, Ordering} from '@rslike/cmp'
+import { type Ord, Ordering } from '@rslike/cmp'
 
-import { None, Option, Some } from '@rslike/std';
+import { None, Option, Some } from '@rslike/std'
 
 class Node implements Ord {
-  left: Node | null;
-  right: Node | null;
+  left: Node | null
+  right: Node | null
 
   constructor(readonly value: number) {
-    this.value = value;
+    this.value = value
   }
   partialEquals(other: unknown): boolean {
-    return this.value == Number(other);
+    return this.value == Number(other)
   }
   notEquals(other: unknown): boolean {
-    return !this.partialEquals(other);
+    return !this.partialEquals(other)
   }
   partialCompare(other: unknown): Option<Ordering> {
-    const asNumber = Number(other);
+    const asNumber = Number(other)
     if (this.value === asNumber) {
-      return Some(Ordering.Equal);
+      return Some(Ordering.Equal)
     } else if (this.value > asNumber) {
-      return Some(Ordering.Greater);
+      return Some(Ordering.Greater)
     } else if (this.value < asNumber) {
-      return Some(Ordering.Less);
+      return Some(Ordering.Less)
     }
     return None()
   }
   lt(other: unknown): boolean {
-    return this.compare(other).isLt();
+    return this.compare(other).isLt()
   }
   le(other: unknown): boolean {
-    return this.compare(other).isLe();
+    return this.compare(other).isLe()
   }
   gt(other: unknown): boolean {
-    return this.compare(other).isGt();
+    return this.compare(other).isGt()
   }
   ge(other: unknown): boolean {
-    return this.compare(other).isGe();
+    return this.compare(other).isGe()
   }
   compare(other: unknown): Ordering {
-    return this.partialCompare(other).unwrap();
+    return this.partialCompare(other).unwrap()
   }
 }
 ```

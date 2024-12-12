@@ -1,6 +1,6 @@
 ---
 import Link from '@/components/Link.astro'
-import { Badge, badgeVariants } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Image } from 'astro:assets'
 import type { CollectionEntry } from 'astro:content'
 
@@ -9,9 +9,9 @@ type Props = {
 }
 
 const colors = {
-  author: "gradient-indigo",
-  contributor: "green",
-} as const;
+  author: 'gradient-indigo',
+  contributor: 'green',
+} as const
 
 const { project } = Astro.props
 ---
@@ -28,10 +28,10 @@ const { project } = Astro.props
       class="w-full object-cover"
     />
     <div class="p-4">
-    <h3 class="flex flex-col sm:flex-row sm:items-center gap-2">
-      <span class="mb-2 text-lg font-semibold">{project.data.name}</span>
-      <!-- <Badge showHash={false} variant={colors[project.data.role]}>{project.data.role}</Badge> -->
-    </h3>
+      <h3 class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <span class="mb-2 text-lg font-semibold">{project.data.name}</span>
+        <!-- <Badge showHash={false} variant={colors[project.data.role]}>{project.data.role}</Badge> -->
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
         {project.data.description}
       </p>
