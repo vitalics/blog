@@ -170,7 +170,7 @@ const authors = await parseAuthors(post.data.authors ?? [])
                   {authors.map((author) => (
                     <div class="flex items-center gap-x-1.5">
                       <Image
-                        src={author.avatar}
+                        src={typeof author.avatar === 'string' ? author.avatar: author.avatar.src}
                         alt={author.name}
                         width={24}
                         height={24}

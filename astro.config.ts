@@ -34,13 +34,6 @@ export default defineConfig({
       changefreq: 'weekly',
       lastmod: new Date(),
       priority: 0.85,
-      serialize: (item) => {
-        // Remove trailing slashes
-        if (item.url.at(-1) === '/') {
-          item.url = item.url.slice(0, -1)
-        }
-        return item
-      },
     }),
     mdx(),
     react(),
