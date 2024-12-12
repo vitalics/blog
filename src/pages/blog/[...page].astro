@@ -41,7 +41,7 @@ const years = Object.keys(postsByYear).sort((a, b) => parseInt(b) - parseInt(a))
   structuredData={{
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
-    url: Astro.url,
+    url: new URL(Astro.url.href, Astro.site),
     name: 'Blog',
     description: 'Blog',
     isPartOf: {
@@ -67,7 +67,7 @@ const years = Object.keys(postsByYear).sort((a, b) => parseInt(b) - parseInt(a))
           '@type': 'ListItem',
           position: 3,
           name: `Page ${page.currentPage}`,
-          item: new URL(Astro.url, Astro.site),
+          item: new URL(Astro.url.href, Astro.site),
         },
       ],
     },
@@ -80,13 +80,14 @@ const years = Object.keys(postsByYear).sort((a, b) => parseInt(b) - parseInt(a))
         return {
           '@type': 'BlogPosting',
           headline: post.data.title,
-          url: new URL(post.slug, Astro.url),
+          url: new URL(`blog/${post.slug}`, Astro.site),
           datePublished: post.data.date,
           author: authors.map((author) => ({
             '@type': 'Person',
             name: author.name,
             url: new URL(`authors/${author.slug}`, Astro.site),
           })),
+          keywords: post.data.tags ?? [],
           description: post.data.description,
         }
       }),

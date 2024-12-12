@@ -51,6 +51,10 @@ const authors = await getCollection('authors')
         author.data.linkedin,
         author.data.github,
         author.data.discord,
+        author.data.telegram,
+        author.data.devto,
+        author.data.medium,
+        author.data.hashnode,
       ].filter(Boolean),
     })),
   }}
@@ -62,7 +66,7 @@ const authors = await getCollection('authors')
         <ul class="not-prose flex flex-col gap-4">
           {authors.map((author) => (
             <li>
-              <AuthorCard author={author} />
+              <AuthorCard transition:name={author.data.name} author={author} />
             </li>
           ))}
         </ul>

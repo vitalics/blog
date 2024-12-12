@@ -26,23 +26,29 @@ const blog = defineCollection({
       tags: z.array(z.string()).optional(),
       authors: z.array(z.string()).optional(),
       draft: z.boolean().optional(),
+      telegram_channel: z.string().optional(),
     }),
 })
 
 const authors = defineCollection({
   type: 'content',
-  schema: z.object({
-    name: z.string(),
-    pronouns: z.string().optional(),
-    avatar: z.string().url(),
-    bio: z.string().optional(),
-    mail: z.string().email().optional(),
-    website: z.string().url().optional(),
-    twitter: z.string().url().optional(),
-    github: z.string().url().optional(),
-    linkedin: z.string().url().optional(),
-    discord: z.string().url().optional(),
-  }),
+  schema: ({ image }) =>
+    z.object({
+      name: z.string(),
+      pronouns: z.string().optional(),
+      avatar: z.string().url().or(image()),
+      bio: z.string().optional(),
+      mail: z.string().email().optional(),
+      website: z.string().url().optional(),
+      twitter: z.string().url().optional(),
+      github: z.string().url().optional(),
+      linkedin: z.string().url().optional(),
+      discord: z.string().url().optional(),
+      telegram: z.string().url().optional(),
+      devto: z.string().url().optional(),
+      medium: z.string().url().optional(),
+      hashnode: z.string().url().optional(),
+    }),
 })
 
 const projects = defineCollection({

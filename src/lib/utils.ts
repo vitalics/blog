@@ -21,13 +21,14 @@ export function readingTime(html: string) {
   return `${readingTimeMinutes} min read`
 }
 
-export async function parseAuthors(authors: string[]) {
+export async function parseAuthors(authors: string[] | undefined) {
   if (!authors || authors.length === 0) return []
 
   const parseAuthor = async (slug: string) => {
     try {
       const author = await getEntry('authors', slug)
       return {
+        ...author!.data,
         slug,
         name: author?.data?.name || slug,
         avatar: author?.data?.avatar || '/static/logo.png',
