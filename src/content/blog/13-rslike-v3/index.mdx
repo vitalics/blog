@@ -1,10 +1,11 @@
 ---
-title: "RSLike@3. Well-known Symbols and more..."
-description: "Not long ago, I released a library that was meant to eliminate errors related to null and undefined. Honestly, I decided ..."
+title: 'RSLike@3. Well-known Symbols and more...'
+description: 'Not long ago, I released a library that was meant to eliminate errors related to null and undefined. Honestly, I decided ...'
 date: 2024-04-12
-image: "./13-rslike-logo.webp"
+image: './13-rslike-logo.webp'
 authors: ['vitalics']
 tags: ['rslike', 'typescript', 'library', 'update', 'comparison']
+telegram_channel: 'haradkou_sdet'
 ---
 
 Not long ago, I released a library that was meant to eliminate errors related to **`null`** and **`undefined`**. Honestly, I admit that I decided to borrow from Rust's [Option](https://doc.rust-lang.org/std/option/) and [Result](https://doc.rust-lang.org/std/result/index.html) APIs, as I saw potential and convenience in it!
@@ -20,54 +21,54 @@ To briefly recount the history of creating this marvel, while studying Rust, I s
 For convenience, I'll show what will be called not as **`Option`** but as **`Some`**, or **`None`**
 
 ```tsx title="example.ts" showLineNumbers caption="usage example"
-Some(); // None<undefined>
-Some(3); // Some<3>
-Some<number>(3); // Some<number>
-Some(undefined); //! None<undefined>
-Some<number>(undefined); //! None<number>
+Some() // None<undefined>
+Some(3) // Some<3>
+Some<number>(3) // Some<number>
+Some(undefined) //! None<undefined>
+Some<number>(undefined) //! None<number>
 
-None(); // None<undefined>
-None(null); // None<null>
-None(3); // None<number>
+None() // None<undefined>
+None(null) // None<null>
+None(3) // None<number>
 ```
 
 **`Result<T,E>`** - is intended for working with code that can "crash". To avoid unexpected crashes, it is desirable to consider all execution options of the function, or wrap it in **`Bind`** to make the function "safe" by returning **`Result<Option<T>, E>`**. Where **`T`** and **`E`** are generics that you can pass to the function.
 
 ```tsx title="index.ts" showLineNumbers
-Ok(3); // Result<3, unknown>
-Ok<number>(3); // Result<number, unknown>
-Ok(undefined); // Result<undefined, unknown>
+Ok(3) // Result<3, unknown>
+Ok<number>(3) // Result<number, unknown>
+Ok(undefined) // Result<undefined, unknown>
 
-Err(undefined); // Result<unkown, undefined>
-Err<number>("hello world"); // Result<number, string>
-Err(new Error("hello world")); // Result<unkown, Error>
+Err(undefined) // Result<unkown, undefined>
+Err<number>('hello world') // Result<number, string>
+Err(new Error('hello world')) // Result<unkown, Error>
 ```
 
 Also, thanks to the useful functions **`Bind`** and **`Async`**, functions and asynchronous code can be made safe, because the result will use double wrapping in **`Result<Option<T>, E>`**
 
 ```tsx title="index.ts" caption="double wrapping example" showLineNumbers
-import { Bind, Async } from "@rslike/std";
+import { Bind, Async } from '@rslike/std'
 function external(arg1: any, arg2: any): any {
   // some implementation, can throw
 }
-external(1, 2); // ok. e.g. returns 5
-external(1, NaN); // throws Error
+external(1, 2) // ok. e.g. returns 5
+external(1, NaN) // throws Error
 
-const binded = Bind(external);
-binded(1, 2); // Ok(Some(5))
-binded(1, NaN); // Err(Error)
+const binded = Bind(external)
+binded(1, 2) // Ok(Some(5))
+binded(1, NaN) // Err(Error)
 
-const promiseOk = Promise.resolve(5);
-const safePromise1 = await Async(promiseOk); // Ok(Some(5))
+const promiseOk = Promise.resolve(5)
+const safePromise1 = await Async(promiseOk) // Ok(Some(5))
 
-safePromise1.isErr(); // false
-safePromise1.isOk(); // true
+safePromise1.isErr() // false
+safePromise1.isOk() // true
 
-const promiseErr = Promise.reject("I fails unexpectedly");
-const safePromise2 = await Async(promiseErr); // Err('I fails unexpectedly')
+const promiseErr = Promise.reject('I fails unexpectedly')
+const safePromise2 = await Async(promiseErr) // Err('I fails unexpectedly')
 
-safePromise2.isErr(); // true
-safePromise2.isOk(); // false
+safePromise2.isErr() // true
+safePromise2.isOk() // false
 ```
 
 And now to what has been changed.
@@ -91,8 +92,8 @@ The simplest example of usage is using the **`for...of`** loop.
 Before version 3, it was necessary to use **`unwrap`**
 
 ```tsx title="v2.ts" showLineNumbers caption="iterator example" {4-6}
-import { Some } from "@rslike/std";
-const a = Some([1, 2, 3]);
+import { Some } from '@rslike/std'
+const a = Some([1, 2, 3])
 
 for (let el of a.unwrap()) {
   // el: 1,2,3
@@ -102,8 +103,8 @@ for (let el of a.unwrap()) {
 Since version 3, syntactic sugar without using unwrap is now available. It's a small thing, but nice 🙃.
 
 ```tsx title="v3.ts" showLineNumbers caption="simple unwrap example" {4-6}
-import { Some } from "@rslike/std";
-const a = Some([1, 2, 3]);
+import { Some } from '@rslike/std'
+const a = Some([1, 2, 3])
 
 for (let el of a) {
   // el: 1,2,3
@@ -113,9 +114,9 @@ for (let el of a) {
 Bonus - TS Type inferring. If the type inside **`Option`** or **`Result`** is not iterable, it will be **`never`**. And also, **`UndefinedBehaviorError`** will be thrown at runtime because a number does not have an implementation of **`Symbol.iterator`** (this method is specifically called for the wrapped value).
 
 ```tsx title="v3.ts" showLineNumbers caption="iterator typescript error" {5}
-import { Some } from "@rslike/std";
+import { Some } from '@rslike/std'
 
-const a = Some(3);
+const a = Some(3)
 for (let el of a) {
   // el: never
 }
@@ -128,19 +129,19 @@ To avoid importing an unnecessary class for just one **`instanceof`** check, [Sy
 Let's look at an example before version 3.
 
 ```tsx title="v2.ts" showLineNumbers caption="instanceof old usage" {3,4}
-import { Ok, Result } from "@rslike/std";
-const a = Ok(3);
-a instanceof Result; // true
-a instanceof Ok; // false
+import { Ok, Result } from '@rslike/std'
+const a = Ok(3)
+a instanceof Result // true
+a instanceof Ok // false
 ```
 
 And now an example after (`Result` importing is not required).
 
 ```tsx title="v3.ts" showLineNumbers caption="instanceof new usage" {3,4}
-import { Ok, Err } from "@rslike/std";
-const a = Ok(3);
-a instanceof Ok; // true
-a instanceof Err; // false
+import { Ok, Err } from '@rslike/std'
+const a = Ok(3)
+a instanceof Ok // true
+a instanceof Err // false
 ```
 
 Yes, it's syntactic sugar to avoid unnecessary imports.
@@ -150,17 +151,17 @@ Yes, it's syntactic sugar to avoid unnecessary imports.
 A separate personal pride - TypeScript and its computed types. Now in **`Some`**, **`None`**, **`Ok`**, **`Err`**, not just generics are passed, but constant generics. This allowed for some tricks. And in cases where we cannot determine the type (or it's more general), the previous implementation will be called.
 
 ```tsx title="v3.ts" showLineNumbers
-import { Some } from "@rslike/std";
+import { Some } from '@rslike/std'
 
-let a: number = 5;
-const a = Some(a); // Some<number>
+let a: number = 5
+const a = Some(a) // Some<number>
 
-a.isSome(); // boolean
+a.isSome() // boolean
 
-let b: number = 5;
-const c = Some(b); // Some<number>
+let b: number = 5
+const c = Some(b) // Some<number>
 
-a.isSome(); // boolean
+a.isSome() // boolean
 ```
 
 But it didn't go without problems. I just can't overcome the issue of mutating the value inside the class. For example, the **`replace`** method - should mutate the value (yes, it does mutate). But how to make TypeScript allow mutating types for the class - that's a riddle 🧐. (if you know - write a comment or message me privately, contact me at the end of the article).
@@ -172,18 +173,18 @@ In the std package, in addition to **`Option`** and **`Result`**, there are also
 Let's compare how it was before (67 lines)
 
 ```tsx title="v2.ts" showLineNumbers caption="match with double unwrapping" {14-30}
-import { Bind, match, Err, Ok } from "@rslike/std";
+import { Bind, match, Err, Ok } from '@rslike/std'
 
 function divide(a: number, b: number) {
-  if (b === 0) Err("Divide to zero");
-  if (a === 0) Ok(0);
-  if (Number.isNaN(a) || Number.isNaN(b)) return Err(undefined);
-  return a / b;
+  if (b === 0) Err('Divide to zero')
+  if (a === 0) Ok(0)
+  if (Number.isNaN(a) || Number.isNaN(b)) return Err(undefined)
+  return a / b
 }
 
-const binded = Bind(divide);
-const fn1 = binded(1, 1); // Result<Option<number | undefined>, string>
-const fn2 = binded(NaN, 1); // Result<Option<undefined>, string>
+const binded = Bind(divide)
+const fn1 = binded(1, 1) // Result<Option<number | undefined>, string>
+const fn2 = binded(NaN, 1) // Result<Option<undefined>, string>
 
 const res1 = match(
   fn1, // or fn2
@@ -191,20 +192,20 @@ const res1 = match(
     return match(
       res,
       (value) => {
-        console.log("value is:", value);
+        console.log('value is:', value)
       },
       () => {
-        console.log("value is None");
+        console.log('value is None')
       },
-    );
+    )
   },
   (err) => {
-    console.error(err);
+    console.error(err)
   },
-);
+)
 
-console.log(res1); // value is: 1
-console.log(res2); // value is None
+console.log(res1) // value is: 1
+console.log(res2) // value is None
 ```
 
 You can notice that the match function is called twice here. It would be simpler to just check for **`isOk`** and **`isSome`**, and the code would be shorter.
@@ -212,31 +213,31 @@ You can notice that the match function is called twice here. It would be simpler
 Starting from version 3 (27 lines)
 
 ```tsx title="v3.ts" showLineNumbers caption="match with single unwrapping!" {14-23}
-import { Bind, match, Err, Ok } from "@rslike/std";
+import { Bind, match, Err, Ok } from '@rslike/std'
 
 function divide(a: number, b: number) {
-  if (b === 0) Err("Divide to zero");
-  if (a === 0) Ok(0);
-  if (Number.isNaN(a) || Number.isNaN(b)) return Err(undefined);
-  return a / b;
+  if (b === 0) Err('Divide to zero')
+  if (a === 0) Ok(0)
+  if (Number.isNaN(a) || Number.isNaN(b)) return Err(undefined)
+  return a / b
 }
 
-const binded = Bind(divide);
-const fn1 = binded(1, 1); // Result<Option<number | undefined>, string>
-const fn2 = binded(NaN, 1); // Result<Option<undefined>, string>
+const binded = Bind(divide)
+const fn1 = binded(1, 1) // Result<Option<number | undefined>, string>
+const fn2 = binded(NaN, 1) // Result<Option<undefined>, string>
 
 const res1 = match(
   fn1, // or fn2
   (value) => {
-    console.log("value is:", value);
+    console.log('value is:', value)
   },
   (err) => {
-    if (err) console.error(err);
-    else console.log("value is None");
+    if (err) console.error(err)
+    else console.log('value is None')
   },
-);
+)
 
-res1; // value is: 1
+res1 // value is: 1
 // or res2 - value is None
 ```
 
@@ -245,25 +246,25 @@ res1; // value is: 1
 For the package intended for comparison (cmp or comparison package), the methods **`equals`**, **`partialEquals`**, and **`compare`** were removed from the interfaces for **`Eq`**, **`PartialEq`**, and **`Ord`**. Instead, the interfaces require the implementation of **`Symbol.equals`**, **`Symbol.partialEquals`**, and **`Symbol.compare`**, respectively.
 
 ```tsx title="v3.ts" showLineNumbers caption="new example usage" {3, 6-8, 14-15, 18-19}
-import { type Eq, equals } from "@rslike/cmp";
+import { type Eq, equals } from '@rslike/cmp'
 
 class Author implements Eq {
   constructor(readonly name: string) {}
 
   [Symbol.equals](another: unknown) {
-    return another instanceof Author && this.name === another.name;
+    return another instanceof Author && this.name === another.name
   }
 }
 
-const pushkin = new Author("Pushkin");
-const tolkien = new Author("Tolkien");
+const pushkin = new Author('Pushkin')
+const tolkien = new Author('Tolkien')
 
-pushkin[Symbol.equals](tolkien); // false
-pushkin[Symbol.equals](new Author("Pushkin")); // true
+pushkin[Symbol.equals](tolkien) // false
+pushkin[Symbol.equals](new Author('Pushkin')) // true
 
 // or you can call the utility function
-equals(pushkin, tolkien); // false
-equals(pushkin, new Author("Pushkin")); // true
+equals(pushkin, tolkien) // false
+equals(pushkin, new Author('Pushkin')) // true
 ```
 
 As a bonus, these well-known symbols are defined for the following global objects:

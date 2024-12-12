@@ -97,10 +97,42 @@ const authors = await parseAuthors(post.data.authors ?? [])
     author: authors.map((author) => ({
       '@type': 'Person',
       name: author.name,
-      url: new URL(`authors/${author.slug}`, Astro.site).toString(),
+      url: new URL(`authors/${author.slug}`, Astro.site),
+      sameAs: [
+        author.linkedin,
+        author.github,
+        author.website,
+        author.twitter,
+        author.telegram,
+        author.mail,
+        author.discord,
+        author.devto,
+        author.medium,
+        author.hashnode,
+      ].filter(Boolean),
     })),
   }}
 >
+  <meta
+    property="article:published_time"
+    content={post.data.date.toISOString()}
+    slot="head"
+  />
+  {
+    post.data.telegram_channel && (
+      <meta
+        property="telegram:channel"
+        content={post.data.telegram_channel}
+        slot="head"
+      />
+    )
+  }
+  {
+    authors.map((author) => (
+      <meta property="author" content={author.name} slot="head" />
+    ))
+  }
+
   <section
     class="grid grid-cols-[minmax(0px,1fr)_min(768px,100%)_minmax(0px,1fr)] gap-y-6 *:px-4"
   >
@@ -138,7 +170,11 @@ const authors = await parseAuthors(post.data.authors ?? [])
                   {authors.map((author) => (
                     <div class="flex items-center gap-x-1.5">
                       <Image
-                        src={author.avatar}
+                        src={
+                          typeof author.avatar === 'string'
+                            ? author.avatar
+                            : author.avatar.src
+                        }
                         alt={author.name}
                         width={24}
                         height={24}

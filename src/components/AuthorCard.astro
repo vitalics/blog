@@ -21,9 +21,15 @@ const {
   linkedin,
   website,
   mail,
+  telegram,
+  devto,
+  hashnode,
+  medium,
 } = author.data
 
 const { Content } = await author.render()
+
+const resolvedAvatar = typeof avatar === 'string'
 
 const socialLinks: SocialLink[] = [
   website && { href: website, label: 'Website' },
@@ -31,6 +37,10 @@ const socialLinks: SocialLink[] = [
   twitter && { href: twitter, label: 'Twitter' },
   linkedin && { href: linkedin, label: 'LinkedIn' },
   mail && { href: mail, label: 'Email' },
+  telegram && { href: telegram, label: 'Telegram' },
+  devto && { href: devto, label: 'dev.to' },
+  hashnode && { href: hashnode, label: 'Hashnode' },
+  medium && { href: medium, label: 'Medium' },
 ].filter(Boolean) as SocialLink[]
 ---
 
@@ -44,7 +54,7 @@ const socialLinks: SocialLink[] = [
     >
       <AvatarComponent
         client:load
-        src={avatar}
+        src={typeof avatar === 'string' ? avatar : avatar.src}
         alt={`Avatar of ${name}`}
         fallback={name[0]}
         className={cn(

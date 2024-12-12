@@ -5,6 +5,14 @@ import type { Link as SocialLink } from '@/consts'
 import { cn } from '@/lib/utils'
 import { Icon } from 'astro-icon/components'
 
+const { default: devtoIcon } = await import(`@/components/icons/devto.svg?raw`)
+const { default: hashnodeIcon } = await import(
+  `@/components/icons/hashnode.svg?raw`
+)
+const { default: mediumIcon } = await import(
+  `@/components/icons/medium.svg?raw`
+)
+
 interface Props {
   links: SocialLink[]
   className?: string
@@ -18,6 +26,7 @@ const iconMap = {
   LinkedIn: 'lucide:linkedin',
   Twitter: 'lucide:twitter',
   Email: 'lucide:mail',
+  Telegram: 'lucide:send',
   RSS: 'lucide:rss',
 }
 
@@ -33,6 +42,7 @@ const getSocialLink = ({ href, label }: SocialLink) => ({
   {
     links.map((link) => {
       const { href, ariaLabel, iconName } = getSocialLink(link)
+      console.log('link:', link)
       return (
         <li>
           <Link
@@ -42,7 +52,14 @@ const getSocialLink = ({ href, label }: SocialLink) => ({
             class={buttonVariants({ variant: 'outline', size: 'icon' })}
             external
           >
-            <Icon name={iconName} class="size-4" />
+            {ariaLabel === 'dev.to' && <Fragment set:html={devtoIcon} />}
+            {ariaLabel === 'Medium' && <Fragment set:html={mediumIcon} />}
+            {ariaLabel === 'Hashnode' && <Fragment set:html={hashnodeIcon} />}
+            {ariaLabel !== 'dev.to' &&
+              ariaLabel !== 'Medium' &&
+              ariaLabel !== 'Hashnode' && (
+                <Icon name={iconName} class="size-4" />
+              )}
           </Link>
         </li>
       )

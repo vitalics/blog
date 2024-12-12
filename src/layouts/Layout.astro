@@ -36,6 +36,7 @@ const { title, description, image, structuredData } = Astro.props
       )
     }
     <ViewTransitions />
+    <slot name="head" />
   </head>
   <body>
     <div

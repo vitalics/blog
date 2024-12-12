@@ -26,7 +26,15 @@ export default defineConfig({
     tailwind({
       applyBaseStyles: false,
     }),
-    sitemap(),
+    sitemap({
+      filter: (page) =>
+        !/https:\/\/blog-vitaliharadkous-projects\,vercel\.app\/blog\/[0-9]+/.test(
+          page,
+        ),
+      changefreq: 'weekly',
+      lastmod: new Date(),
+      priority: 0.85,
+    }),
     mdx(),
     react(),
     icon(),

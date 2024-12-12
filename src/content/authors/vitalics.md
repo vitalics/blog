@@ -1,10 +1,15 @@
 ---
 name: 'Vitali Haradkou'
 pronouns: 'he/him'
-avatar: 'https://avatars.githubusercontent.com/u/8816260?v=4'
+avatar: './avatar.webp'
 website: 'https://blog-vitaliharadkous-projects.vercel.app'
 github: 'https://github.com/vitalics'
 mail: 'vitalicset@gmail.com'
+telegram: https://t.me/vitalicset
+devto: 'https://dev.to/vitalicset'
+medium: 'https://medium.com/@vitalicset'
+hashnode: 'https://hashnode.com/@Vitalicset'
+linkedin: 'https://www.linkedin.com/in/vitalicset'
 ---
 
 # About me

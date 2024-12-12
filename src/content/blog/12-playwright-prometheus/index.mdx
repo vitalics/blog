@@ -1,13 +1,20 @@
 ---
-title: "Playwright & Prometheus. Send your metrics in real-time"
+title: 'Playwright & Prometheus. Send your metrics in real-time'
 description: How we use prometheus to send metrics from playwright tests
 date: 2023-12-18
-image: "./12-pw-prometheus-hero.webp"
-tags: ['library', 'playwright', 'reporter', 'playwright-prometheus-remote-write-reporter']
+image: './12-pw-prometheus-hero.webp'
+tags:
+  [
+    'library',
+    'playwright',
+    'reporter',
+    'playwright-prometheus-remote-write-reporter',
+  ]
 authors: ['vitalics']
+telegram_channel: 'haradkou_sdet'
 ---
 
-import FileTree from "@/components/FileTree/index.astro";
+import FileTree from '@/components/FileTree/index.astro'
 
 ## What is a Playwright?
 
@@ -36,10 +43,8 @@ We use [prometheus-remote-write](https://github.com/huksley/prometheus-remote-wr
 ### Technical details
 
 <FileTree title="Project Structure">
-- src
-  - **index.ts** - reporter implementation
-  - **helper.ts** - exported runtime API
-- package.json
+  - src - **index.ts** - reporter implementation - **helper.ts** - exported
+  runtime API - package.json
 </FileTree>
 
 #### helper.ts
@@ -60,8 +65,8 @@ abstract class Metric {
 
 export class Counter extends Metric {
   protected counter: number = 0
-  inc(value){
-    this.counter += value;
+  inc(value) {
+    this.counter += value
   }
 }
 
@@ -69,7 +74,7 @@ export class Gauge extends Counter {
   set(value) {
     this.counter = value
   }
-  dec(value){
+  dec(value) {
     this.counter -= value
   }
 }
@@ -80,33 +85,37 @@ export class Gauge extends Counter {
 ```ts title="example.ts" showLineNumbers caption="usage example"
 import { Counter, Gauge } from './helper'
 
-import {Reporter} from '@playwright/test'
+import { Reporter } from '@playwright/test'
 
 export { Counter, Gauge }
 
 export default class PrometheusReporter implements Reporter {
-  private test = new Counter({
-    name: 'test'
-  }, 1) // always static, let it be 1
-  constructor(options){
+  private test = new Counter(
+    {
+      name: 'test',
+    },
+    1,
+  ) // always static, let it be 1
+  constructor(options) {
     this.options = options
   }
-  private async send(timeseries: Timeseries | Timeseries[]){
+  private async send(timeseries: Timeseries | Timeseries[]) {
     // send metrics to prometheus using options
   }
   async onTestEnd(test, result) {
-    this.test.labels({
-      title: test.title,
-      id: test.id,
-      // ...etc
-    }).inc()
+    this.test
+      .labels({
+        title: test.title,
+        id: test.id,
+        // ...etc
+      })
+      .inc()
 
     await this.send(this.test._getSeries())
 
     this.test.reset() // new test, new counter
   }
 }
-
 ```
 
 ## How to start?
@@ -139,13 +148,16 @@ in your `playwight.config.ts` add next line
 
 ```ts title="playwight.config.ts" showLineNumbers caption="playwright config" {4}
 export default defineConfig({
-// ...
+  // ...
   reporter: [
-    ['playwright-prometheus-remote-write-reporter', {
-      // options object
-    }]
+    [
+      'playwright-prometheus-remote-write-reporter',
+      {
+        // options object
+      },
+    ],
   ],
-// ...
+  // ...
 })
 ```
 
@@ -157,20 +169,27 @@ Apart from built-in metrics. We export `Counter` and `Gauge` classes to make cus
 import { test } from '@playwright/test'
 import { Counter } from 'playwright-prometheus-remote-write-reporter'
 
-const gotoCounter = new Counter({
-  name: 'url',
-}, 0)
+const gotoCounter = new Counter(
+  {
+    name: 'url',
+  },
+  0,
+)
 
-test('example test', async ({page}) => {
+test('example test', async ({ page }) => {
   await page.goto('http://example.com')
-  gotoCounter.labels({
-    url: 'http://example.com'
-  }).inc() // 1
+  gotoCounter
+    .labels({
+      url: 'http://example.com',
+    })
+    .inc() // 1
 
   await page.goto('https://playwright.dev')
-  gotoCounter.labels({
-    url: 'https://playwright.dev'
-  }).inc() // 2
+  gotoCounter
+    .labels({
+      url: 'https://playwright.dev',
+    })
+    .inc() // 2
 })
 
 test.afterEach(() => {
@@ -184,6 +203,7 @@ test.afterEach(() => {
 As you can see - now your metrics are exportable and ready to display in Grafana.
 
 ![prometheus result](./12-result.png)
+
 > Image 1. Result from package example
 
 **Note 1**: Unfortunately, in my machine grafana cannot establish the connection to Prometheus. So you might see only the local Prometheus instance.
