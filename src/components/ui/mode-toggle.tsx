@@ -8,7 +8,7 @@ import {
 import { Laptop, Moon, Sun } from 'lucide-react'
 import * as React from 'react'
 
-export function ModeToggle() {
+export function useModeToggle() {
   const [theme, setThemeState] = React.useState<
     'theme-light' | 'dark' | 'system'
   >('theme-light')
@@ -37,6 +37,12 @@ export function ModeToggle() {
     })
   }, [theme])
 
+  return { theme, setTheme: setThemeState }
+}
+
+export function ModeToggle() {
+  const { setTheme } = useModeToggle()
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -52,15 +58,15 @@ export function ModeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-background">
-        <DropdownMenuItem onClick={() => setThemeState('theme-light')}>
+        <DropdownMenuItem onClick={() => setTheme('theme-light')}>
           <Sun className="mr-2 size-4" />
           <span>Light</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setThemeState('dark')}>
+        <DropdownMenuItem onClick={() => setTheme('dark')}>
           <Moon className="mr-2 size-4" />
           <span>Dark</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setThemeState('system')}>
+        <DropdownMenuItem onClick={() => setTheme('system')}>
           <Laptop className="mr-2 size-4" />
           <span>System</span>
         </DropdownMenuItem>

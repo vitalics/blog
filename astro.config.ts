@@ -19,18 +19,17 @@ import sectionize from '@hbsnow/rehype-sectionize'
 
 import icon from 'astro-icon'
 
+import vercel from '@astrojs/vercel/serverless'
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://blog-vitaliharadkous-projects.vercel.app',
+
   integrations: [
     tailwind({
       applyBaseStyles: false,
     }),
     sitemap({
-      filter: (page) =>
-        !/https:\/\/blog-vitaliharadkous-projects\,vercel\.app\/blog\/[0-9]+/.test(
-          page,
-        ),
       changefreq: 'weekly',
       lastmod: new Date(),
       priority: 0.85,
@@ -39,6 +38,7 @@ export default defineConfig({
     react(),
     icon(),
   ],
+
   markdown: {
     syntaxHighlight: false,
     rehypePlugins: [
@@ -72,14 +72,21 @@ export default defineConfig({
     ],
     remarkPlugins: [remarkToc, remarkMath, remarkEmoji],
   },
+
   prefetch: {
     prefetchAll: true,
   },
+
   server: {
     port: 1234,
     host: true,
   },
+
   devToolbar: {
     enabled: false,
   },
+
+  output: 'server',
+
+  adapter: vercel({}),
 })
