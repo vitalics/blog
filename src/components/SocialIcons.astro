@@ -42,7 +42,6 @@ const getSocialLink = ({ href, label }: SocialLink) => ({
   {
     links.map((link) => {
       const { href, ariaLabel, iconName } = getSocialLink(link)
-      console.log('link:', link)
       return (
         <li>
           <Link
