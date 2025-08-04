@@ -29,8 +29,6 @@ const {
 
 const { Content } = await author.render()
 
-const resolvedAvatar = typeof avatar === 'string'
-
 const socialLinks: SocialLink[] = [
   website && { href: website, label: 'Website' },
   github && { href: github, label: 'GitHub' },
