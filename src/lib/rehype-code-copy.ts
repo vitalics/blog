@@ -27,28 +27,6 @@ export function rehypeCodeCopy() {
           }
           node.properties['data-code'] = codeText
           
-          // Extract language from code element's className (e.g., language-typescript)
-          const codeClassName = codeEl.properties?.className as string[] | undefined
-          if (codeClassName) {
-            const languageClass = codeClassName.find((cls) => cls.startsWith('language-'))
-            if (languageClass) {
-              const language = languageClass.replace('language-', '')
-              node.properties['data-language'] = language
-            }
-          }
-          
-          // Extract title and caption if they exist
-          const title = node.properties['data-title']
-          const caption = node.properties['data-caption']
-          
-          if (title) {
-            node.properties['data-title'] = title
-          }
-          
-          if (caption) {
-            node.properties['data-caption'] = caption
-          }
-          
           // Add a class to indicate this pre has copy functionality
           const className = node.properties.className as string[] | undefined
           node.properties.className = [...(className || []), 'code-block-with-copy']

@@ -210,8 +210,8 @@ export default async function BlogSlugOrPagePage({
     <>
       <StructuredData data={blogPostStructuredData} />
       <StructuredData data={breadcrumbStructuredData} />
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-8 px-4 py-12 xl:grid-cols-[minmax(0,900px)_280px] xl:px-8">
-        <article className="min-w-0 w-full">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-12 xl:grid-cols-[1fr_250px]">
+        <article className="min-w-0">
           <Breadcrumbs items={breadcrumbs} />
           
           {post.image && (
@@ -259,11 +259,6 @@ export default async function BlogSlugOrPagePage({
             </div>
           )}
         </header>
-
-        {/* Mobile/Tablet TOC */}
-        <div className="xl:hidden">
-          <TableOfContents items={toc} />
-        </div>
 
         <MDXWrapper>
           <div className="prose max-w-none">
