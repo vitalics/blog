@@ -75,6 +75,11 @@ export const KNOWN_TAGS: Record<string, KnownTag> = {
     image: '/tags/k6.svg',
     color: '#7D64FF',
   },
+  astro: {
+    name: 'Astro',
+    image: '/tags/astro.svg',
+    color: '#FF5D01',
+  },
 }
 
 export function isKnownTag(tag: string): boolean {
