@@ -1,0 +1,163 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with dark gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f0f1a;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Subtle grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+    </pattern>
+    
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Playwright gradient -->
+    <linearGradient id="pwGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2EAD33" />
+      <stop offset="50%" style="stop-color:#45D156" />
+      <stop offset="100%" style="stop-color:#2EAD33" />
+    </linearGradient>
+    
+    <!-- Accent gradient for badges -->
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#45D156" />
+      <stop offset="100%" style="stop-color:#2EAD33" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  
+  <!-- Playwright Logo (simplified theater masks) -->
+  <g transform="translate(300, 180) scale(1.2)">
+    <!-- Happy mask -->
+    <g filter="url(#glow)">
+      <circle cx="50" cy="60" r="45" fill="none" stroke="url(#pwGradient)" stroke-width="3"/>
+      <!-- Eyes -->
+      <circle cx="40" cy="50" r="4" fill="url(#pwGradient)"/>
+      <circle cx="60" cy="50" r="4" fill="url(#pwGradient)"/>
+      <!-- Smile -->
+      <path d="M 35 70 Q 50 80 65 70" stroke="url(#pwGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    
+    <!-- Sad mask -->
+    <g transform="translate(60, 0)" filter="url(#glow)">
+      <circle cx="50" cy="60" r="45" fill="none" stroke="url(#pwGradient)" stroke-width="3"/>
+      <!-- Eyes -->
+      <circle cx="40" cy="50" r="4" fill="url(#pwGradient)"/>
+      <circle cx="60" cy="50" r="4" fill="url(#pwGradient)"/>
+      <!-- Frown -->
+      <path d="M 35 75 Q 50 65 65 75" stroke="url(#pwGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+  </g>
+  
+  <!-- "Labs" beaker icon -->
+  <g transform="translate(550, 200) scale(1.1)">
+    <g filter="url(#glow)">
+      <!-- Beaker body -->
+      <path d="M 30 20 L 35 80 Q 50 95 65 80 L 70 20 Z" 
+            fill="none" 
+            stroke="url(#pwGradient)" 
+            stroke-width="3"/>
+      <!-- Beaker top -->
+      <rect x="25" y="15" width="50" height="8" rx="2" fill="url(#pwGradient)" opacity="0.3"/>
+      <!-- Liquid inside -->
+      <path d="M 36 60 L 38 82 Q 50 92 62 82 L 64 60 Z" 
+            fill="url(#pwGradient)" 
+            opacity="0.2"/>
+      <!-- Bubbles -->
+      <circle cx="45" cy="70" r="3" fill="#45D156" opacity="0.6"/>
+      <circle cx="55" cy="75" r="2.5" fill="#45D156" opacity="0.5"/>
+      <circle cx="48" cy="80" r="2" fill="#45D156" opacity="0.4"/>
+    </g>
+  </g>
+  
+  <!-- Code brackets decoration -->
+  <g transform="translate(750, 220)">
+    <g filter="url(#glow)">
+      <text x="0" y="0" font-family="'Courier New', monospace" font-size="80" font-weight="700" fill="url(#pwGradient)" opacity="0.6">
+        { }
+      </text>
+    </g>
+  </g>
+  
+  <!-- Best practices icons (checkmarks) -->
+  <g transform="translate(900, 200)">
+    <g filter="url(#glow)">
+      <!-- Checkmark 1 -->
+      <circle cx="20" cy="20" r="18" fill="url(#pwGradient)" opacity="0.3"/>
+      <path d="M 12 20 L 18 26 L 28 14" stroke="#45D156" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Checkmark 2 -->
+      <circle cx="20" cy="60" r="18" fill="url(#pwGradient)" opacity="0.3"/>
+      <path d="M 12 60 L 18 66 L 28 54" stroke="#45D156" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Checkmark 3 -->
+      <circle cx="20" cy="100" r="18" fill="url(#pwGradient)" opacity="0.3"/>
+      <path d="M 12 100 L 18 106 L 28 94" stroke="#45D156" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  
+  <!-- Decorative elements -->
+  <circle cx="150" cy="100" r="3" fill="#45D156" opacity="0.6"/>
+  <circle cx="1050" cy="530" r="3" fill="#2EAD33" opacity="0.6"/>
+  <circle cx="200" cy="550" r="2" fill="#45D156" opacity="0.4"/>
+  <circle cx="1000" cy="80" r="2" fill="#2EAD33" opacity="0.4"/>
+  <circle cx="180" cy="150" r="2" fill="#45D156" opacity="0.5"/>
+  <circle cx="1020" cy="120" r="2" fill="#2EAD33" opacity="0.5"/>
+  
+  <!-- Connecting lines -->
+  <line x1="300" y1="300" x2="450" y2="400" stroke="url(#pwGradient)" stroke-width="1" opacity="0.2" stroke-dasharray="5,5"/>
+  <line x1="600" y1="320" x2="750" y2="420" stroke="url(#pwGradient)" stroke-width="1" opacity="0.2" stroke-dasharray="5,5"/>
+  <line x1="850" y1="300" x2="950" y2="380" stroke="url(#pwGradient)" stroke-width="1" opacity="0.2" stroke-dasharray="5,5"/>
+  
+  <!-- Title -->
+  <text x="600" y="470" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="60" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="-1">
+    Playwright Labs
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="525" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="400" fill="#A0A0A0" text-anchor="middle">
+    Best Practices as Code • AI-Powered Testing
+  </text>
+  
+  <!-- Category badges -->
+  <g transform="translate(280, 560)">
+    <rect width="155" height="32" rx="16" fill="url(#pwGradient)" opacity="0.2"/>
+    <text x="77.5" y="21" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="600" fill="#45D156" text-anchor="middle">
+      8 Categories
+    </text>
+  </g>
+  
+  <g transform="translate(455, 560)">
+    <rect width="155" height="32" rx="16" fill="url(#pwGradient)" opacity="0.2"/>
+    <text x="77.5" y="21" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="600" fill="#45D156" text-anchor="middle">
+      Best Practices
+    </text>
+  </g>
+  
+  <g transform="translate(630, 560)">
+    <rect width="155" height="32" rx="16" fill="url(#pwGradient)" opacity="0.2"/>
+    <text x="77.5" y="21" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="600" fill="#45D156" text-anchor="middle">
+      LLM-Optimized
+    </text>
+  </g>
+  
+  <g transform="translate(805, 560)">
+    <rect width="115" height="32" rx="16" fill="url(#pwGradient)" opacity="0.2"/>
+    <text x="57.5" y="21" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14" font-weight="600" fill="#45D156" text-anchor="middle">
+      Open Source
+    </text>
+  </g>
+</svg>
