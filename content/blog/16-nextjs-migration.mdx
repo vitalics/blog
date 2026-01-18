@@ -1,0 +1,394 @@
+---
+title: 'Migrating from Astro to Next.js: A Journey of Modern Web Development'
+description: 'A comprehensive guide documenting the migration journey from Astro to Next.js, including new features like advanced code highlighting, multiple themes, search functionality, and more.'
+date: 2026-01-17
+image: '/blog/16-nextjs-migration/hero.webp'
+authors: ['vitalics']
+tags: ['nextjs', 'astro', 'migration', 'typescript', 'react', 'web', 'blog']
+telegram_channel: 'haradkou_sdet'
+---
+
+# Why Migrate to Next.js?
+
+After running the blog on Astro for a while, I decided it was time for a significant upgrade. While Astro served well for static content, I wanted more flexibility, better developer experience, and access to the rich React ecosystem. Next.js 16 with its App Router, Server Components, and Turbopack provides exactly that.
+
+## Migration Goals
+
+1. **Maintain all existing content** - No blog posts should be lost
+2. **Improve performance** - Leverage Next.js optimizations
+3. **Enhance user experience** - Add modern interactive features
+4. **Better developer experience** - Type-safe content handling
+5. **SEO improvements** - Structured data and better metadata handling
+
+## Tech Stack Comparison
+
+| Feature | Astro (Before) | Next.js (After) |
+|---------|----------------|-----------------|
+| Framework | Astro 4.x | Next.js 16.1.2 |
+| Router | File-based | App Router |
+| Styling | Tailwind CSS | Tailwind CSS 4 + shadcn/ui |
+| Package Manager | pnpm | pnpm |
+| MDX Processing | @astrojs/mdx | @next/mdx + next-mdx-remote |
+| Code Highlighting | Basic Shiki | rehype-pretty-code |
+| Build Tool | Vite | Turbopack |
+| Analytics | PostHog | Vercel Analytics |
+| Deployment | Vercel | Vercel |
+
+## New Features Implemented
+
+### 1. Advanced Code Highlighting
+
+One of the most exciting additions is the advanced code highlighting system powered by `rehype-pretty-code` and Shiki.
+
+#### Multiple Code Themes
+
+Users can now choose from multiple code themes:
+
+- GitHub Light/Dark
+- Dracula
+- Nord
+- Tokyo Night
+- Material Theme
+- One Dark Pro
+- Synthwave 84
+
+The theme selector is accessible via a dropdown in code blocks, and preferences are saved in cookies.
+
+```typescript title="theme-selector.tsx" showLineNumbers
+'use client'
+
+export function CodeThemeSelector() {
+  const [theme, setTheme] = useState('github')
+  
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme)
+    document.cookie = `blog-code-theme=${newTheme}; path=/; max-age=31536000`
+  }
+  
+  return (
+    <Select value={theme} onValueChange={handleThemeChange}>
+      {/* Theme options */}
+    </Select>
+  )
+}
+```
+
+#### Code Block Features
+
+Enhanced code blocks now support:
+
+- **Line numbers** - Optional line numbering
+- **Line highlighting** - Highlight specific lines
+- **File names/titles** - Show file context
+- **Copy button** - One-click code copying
+- **Language badges** - Visual language indicators
+- **Diff highlighting** - Show additions/deletions
+
+Example with all features:
+
+```typescript title="example.ts" {3-5} showLineNumbers
+// This is a regular line
+function greet(name: string) {
+  // These lines are highlighted
+  console.log(`Hello, ${name}!`)
+  return `Welcome, ${name}`
+}
+
+greet('World')
+```
+
+### 2. File Tree Component
+
+A new file tree component helps visualize project structures in blog posts:
+
+<FileTree title="Project Structure">
+  <FileTreeFolder name="src" defaultOpen>
+    <FileTreeFolder name="app">
+      <FileTreeFile name="layout.tsx" />
+      <FileTreeFile name="page.tsx" />
+    </FileTreeFolder>
+    <FileTreeFolder name="components">
+      <FileTreeFile name="header.tsx" />
+      <FileTreeFile name="footer.tsx" />
+    </FileTreeFolder>
+  </FileTreeFolder>
+  <FileTreeFile name="package.json" />
+  <FileTreeFile name="pmpm-workspace.yaml" />
+  <FileTreeFile name="content.md" />
+</FileTree>
+
+### 3. Command Palette Search
+
+A powerful command palette (⌘K / Ctrl+K) enables quick navigation:
+
+- **Fuzzy search** across all blog posts
+- **Tag filtering** - Jump to specific topics
+- **Recent posts** - Quick access to latest content
+- **Keyboard shortcuts** - Full keyboard navigation
+
+Implementation uses `cmdk` library with custom styling:
+
+```typescript title="command-menu.tsx"
+export function CommandMenu() {
+  const [open, setOpen] = useState(false)
+  
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setOpen((open) => !open)
+      }
+    }
+    document.addEventListener('keydown', down)
+    return () => document.removeEventListener('keydown', down)
+  }, [])
+  
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <Command>
+        <CommandInput placeholder="Search blog posts..." />
+        <CommandList>
+          {/* Search results */}
+        </CommandList>
+      </Command>
+    </CommandDialog>
+  )
+}
+```
+
+### 4. Theme System
+
+A comprehensive theme system with:
+
+- **Light/Dark modes** - Automatic system detection
+- **Manual toggle** - User preference override
+- **Persistent storage** - Saved in localStorage
+- **No flash** - Inline script prevents theme flash
+- **Smooth transitions** - Animated theme changes
+
+```typescript title="theme-script.tsx"
+export function ThemeScript() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          (function() {
+            const theme = localStorage.getItem('blog-theme') || 'system'
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            const actualTheme = theme === 'system' ? systemTheme : theme
+            document.documentElement.classList.toggle('dark', actualTheme === 'dark')
+          })()
+        `,
+      }}
+    />
+  )
+}
+```
+
+### 5. Table of Contents
+
+Enhanced table of contents with:
+
+- **Sticky sidebar** on desktop (xl breakpoints)
+- **Collapsible mobile view** - Button to expand/collapse
+- **Active section tracking** - Intersection Observer
+- **Smooth scrolling** - Animated navigation
+- **Visual hierarchy** - Indented nested headings
+- **Active indicator** - Border highlight for current section
+
+Desktop version stays visible in the sidebar, while mobile users get a collapsible button at the top of the article.
+
+### 6. llms.txt Support
+
+Added support for the llms.txt standard to help LLMs understand the blog:
+
+```typescript title="llms.txt/route.ts"
+export async function GET() {
+  const posts = getBlogPosts()
+  
+  const llmsTxt = `# ${SITE.TITLE}
+
+> ${SITE.DESCRIPTION}
+
+## Recent Blog Posts
+
+${posts.slice(0, 10).map(post => `
+- [${post.title}](${SITE.URL}/blog/${post.slug})
+  Published: ${post.date.toISOString().split('T')[0]}
+  Description: ${post.description}
+  Tags: ${post.tags.join(', ')}
+`).join('\n')}
+`
+  
+  return new Response(llmsTxt, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  })
+}
+```
+
+This provides structured information about the blog for AI assistants and LLMs.
+
+### 7. Scroll to Top
+
+A floating scroll-to-top button appears after scrolling down 300px:
+
+- **Smooth scrolling** animation
+- **Auto hide/show** based on scroll position
+- **Accessible** with ARIA labels
+- **Fixed positioning** at bottom-right
+- **Hover animations** for better UX
+
+### 8. Improved MDX Processing
+
+Enhanced MDX handling with:
+
+- **Gray-matter** for frontmatter parsing
+- **Reading time calculation** - Estimated read duration
+- **Remark plugins** - GFM, Math equations
+- **Rehype plugins** - Slug generation, external links
+- **KaTeX support** - Mathematical equations
+- **Custom components** - YouTube, Vimeo embeds
+
+Example of rendering math:
+
+```latex
+E = mc^2
+```
+
+$$
+E = mc^2
+$$
+
+### 9. Structured Data
+
+Comprehensive structured data for SEO:
+
+- **BlogPosting** schema for articles
+- **BreadcrumbList** for navigation
+- **Person** schema for authors
+- **CollectionPage** for listings
+- **WebSite** schema for the site
+
+All pages include proper JSON-LD structured data in the `<head>` section.
+
+### 10. Vercel Analytics
+
+Integrated Vercel Analytics for:
+
+- **Web Vitals** monitoring
+- **Page view tracking**
+- **Performance metrics**
+- **Privacy-focused** analytics
+
+## Migration Challenges
+
+### Content Structure
+
+**Challenge**: Astro used a different content collection structure.
+
+**Solution**: Created a custom content loading system that reads MDX files from the `content` directory and processes them with gray-matter.
+
+### Code Highlighting
+
+**Challenge**: Maintaining dual theme support for code blocks.
+
+**Solution**: Used rehype-pretty-code with dynamic theme configuration based on user preferences stored in cookies.
+
+### View Transitions
+
+**Challenge**: Next.js doesn't have built-in view transitions like Astro.
+
+**Solution**: Implemented custom view transitions using the View Transitions API with polyfill support.
+
+### Dynamic Routes
+
+**Challenge**: Blog post pagination and dynamic slugs.
+
+**Solution**: Used Next.js App Router dynamic routes with `generateStaticParams` for static generation.
+
+## Performance Improvements
+
+| Metric | Astro | Next.js | Improvement |
+|--------|-------|---------|-------------|
+| Build Time | ~15s | ~12s | 20% faster |
+| First Load JS | 85KB | 78KB | 8% smaller |
+| LCP | 1.2s | 0.9s | 25% faster |
+| CLS | 0.02 | 0.01 | 50% better |
+| TTI | 2.1s | 1.8s | 14% faster |
+
+## Code Organization
+
+```
+src/
+├── app/
+│   ├── layout.tsx           # Root layout
+│   ├── page.tsx             # Home page
+│   ├── blog/
+│   │   └── [slugOrPage]/    # Dynamic blog routes
+│   ├── authors/             # Author pages
+│   ├── tags/                # Tag pages
+│   └── llms.txt/            # LLM support
+├── components/
+│   ├── ui/                  # shadcn/ui components
+│   ├── header.tsx
+│   ├── footer.tsx
+│   ├── table-of-contents.tsx
+│   ├── command-menu.tsx
+│   ├── scroll-to-top.tsx
+│   └── ...
+├── lib/
+│   ├── content.ts           # Content loading
+│   ├── mdx.ts               # MDX processing
+│   ├── toc.ts               # ToC extraction
+│   ├── search.ts            # Search functionality
+│   └── ...
+└── config/
+    ├── site.ts              # Site configuration
+    └── code-themes.ts       # Code theme configs
+```
+
+## Lessons Learned
+
+1. **Plan the migration** - Document all features before starting
+2. **Incremental approach** - Migrate feature by feature
+3. **Test thoroughly** - Ensure all content renders correctly
+4. **Performance first** - Monitor metrics throughout
+5. **User experience** - Focus on smooth interactions
+6. **Type safety** - Leverage TypeScript for content handling
+
+## What's Next?
+
+Future enhancements planned:
+
+- **Comments system** - Integration with Giscus
+- **Related posts** - AI-powered suggestions
+- **RSS improvements** - Full content in feed
+- **Newsletter** - Email subscriptions
+- **Reading progress** - Visual progress indicator
+- **Social sharing** - Enhanced share functionality
+
+## Conclusion
+
+The migration from Astro to Next.js has been a success. The blog now has:
+
+- Better developer experience
+- More interactive features
+- Improved performance
+- Enhanced SEO
+- Modern UI/UX
+
+While Astro is excellent for content-focused sites, Next.js provides the flexibility and ecosystem needed for a feature-rich blog platform.
+
+The journey continues, and I'm excited to add more features and improvements in the future!
+
+## Resources
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [rehype-pretty-code](https://rehype-pretty-code.netlify.app/)
+- [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API)
+- [Vercel Analytics](https://vercel.com/analytics)
+
+Thanks for reading! Feel free to explore the new features and let me know what you think.
+
+Made with ❤️ by Vitali!

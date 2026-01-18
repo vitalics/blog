@@ -9,6 +9,7 @@ import { ThemeScript } from '@/components/theme-script'
 import { CommandMenu } from '@/components/command-menu'
 import { ViewTransitions } from '@/components/view-transitions'
 import { Analytics } from '@vercel/analytics/react'
+import { ScrollToTop } from '@/components/scroll-to-top'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -67,6 +68,7 @@ export default function RootLayout({
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
+          <ScrollToTop />
         </ThemeProvider>
         <Analytics />
       </body>
