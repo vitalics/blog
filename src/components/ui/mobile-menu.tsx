@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -6,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { NAV_LINKS } from '@/consts'
+import { NAV_LINKS } from '@/config/site'
 import { Menu } from 'lucide-react'
 
 const MobileMenu = () => {
