@@ -42,68 +42,17 @@ One of the most exciting additions is the advanced code highlighting system powe
 
 #### Multiple Code Themes
 
-One of the standout features is the comprehensive code theme system. Users can now personalize their reading experience by choosing from **13 carefully curated code themes**, each supporting both light and dark variants:
+Users can now choose from multiple code themes:
 
-| Theme | Light Variant | Dark Variant | Description |
-|-------|---------------|--------------|-------------|
-| **GitHub** | GitHub Light | GitHub Dark | Clean, minimal theme from GitHub |
-| **GitHub Dimmed** | GitHub Light | GitHub Dark Dimmed | Softer variant of GitHub's dark theme |
-| **One Dark Pro** | One Light | One Dark Pro | Popular Atom-inspired theme |
-| **Dracula** | GitHub Light | Dracula | Vibrant purple-based theme |
-| **Night Owl** | GitHub Light | Night Owl | Sarah Drasner's acclaimed theme |
-| **Monokai** | GitHub Light | Monokai | Classic Sublime Text theme |
-| **Nord** | GitHub Light | Nord | Arctic, north-bluish color palette |
-| **Catppuccin** | Catppuccin Latte | Catppuccin Mocha | Soothing pastel theme |
-| **Rosé Pine** | GitHub Light | Rosé Pine | All natural pine with a hint of soho vibes |
-| **Tokyo Night** | GitHub Light | Tokyo Night | Clean, elegant theme inspired by Tokyo's night |
-| **Material Theme** | Material Lighter | Material Darker | Google's Material Design palette |
-| **Vitesse** | Vitesse Light | Vitesse Dark | Anthony Fu's fast and minimal theme |
-| **Min** | Min Light | Min Dark | Minimalist, distraction-free theme |
+- GitHub Light/Dark
+- Dracula
+- Nord
+- Tokyo Night
+- Material Theme
+- One Dark Pro
+- Synthwave 84
 
-**Key Features:**
-
-- **Automatic Theme Switching** - Code blocks automatically adapt to your system's light/dark mode
-- **Independent Selection** - Choose a code theme independent of your site theme
-- **Persistent Preferences** - Your choice is saved in cookies (1 year expiration)
-- **Smooth Transitions** - Themes switch seamlessly without page reload
-- **Dual Theme Support** - Each theme includes optimized light and dark variants
-- **Syntax Awareness** - Powered by Shiki for accurate syntax highlighting across 200+ languages
-
-**How It Works:**
-
-The theme selector is accessible via a dropdown in the top-right corner of any code block. When you select a theme:
-
-1. The preference is immediately saved to cookies (`blog-code-theme`)
-2. All code blocks on the page update instantly
-3. The theme persists across page navigation
-4. Light/dark variants switch automatically based on your system theme
-
-```typescript title="code-themes.ts" caption="Example of theme configuration" showLineNumbers
-export interface CodeTheme {
-  name: string        // Internal identifier
-  label: string       // Display name
-  light: string       // Shiki light theme
-  dark: string        // Shiki dark theme
-}
-
-export const CODE_THEMES: Record<string, CodeTheme> = {
-  github: {
-    name: 'github',
-    label: 'GitHub',
-    light: 'github-light',
-    dark: 'github-dark',
-  },
-  dracula: {
-    name: 'dracula',
-    label: 'Dracula',
-    light: 'github-light',
-    dark: 'dracula',
-  },
-  // ... more themes
-}
-```
-
-The implementation uses server-side rendering with cookie-based preferences, ensuring there's no flash of unstyled code on page load.
+The theme selector is accessible via a dropdown in code blocks, and preferences are saved in cookies.
 
 ```typescript title="theme-selector.tsx" showLineNumbers
 'use client'
@@ -132,177 +81,41 @@ Enhanced code blocks now support:
 - **Line highlighting** - Highlight specific lines
 - **File names/titles** - Show file context
 - **Copy button** - One-click code copying
-- **Expand to modal** - Full-screen code view with backdrop effect
 - **Language badges** - Visual language indicators
 - **Diff highlighting** - Show additions/deletions
 
-**Expand Feature:**
+Example with all features:
 
-Every code block includes an expand button (⛶) in the top-right corner (next to the copy button) that opens a modal dialog with:
-
-- **Large viewport** - 90% of screen height for maximum code visibility
-- **Extra-wide layout** - 6xl width (1280px) for long lines
-- **Backdrop effect** - Semi-transparent overlay (80% opacity) for focus
-- **Perfect syntax highlighting** - Full Shiki theme support with all CSS variables
-- **Theme awareness** - Automatically adapts to light/dark mode
-- **Smooth scrolling** - Both horizontal and vertical overflow
-- **Clean presentation** - Title shown in modal header, no duplication
-- **Context display** - Language displayed in modal title
-- **Preserved features** - Line numbers, highlighting, and diff colors maintained
-
-**Implementation Details:**
-
-The expand feature works by:
-1. Cloning the entire `<pre>` element with all Shiki-generated HTML
-2. Removing button containers and data attributes to prevent duplication
-3. Rendering the cloned HTML in a modal with `.prose` class for proper CSS scoping
-4. Using `dangerouslySetInnerHTML` to preserve all syntax highlighting
-
-This is especially useful for long code snippets that would otherwise require excessive scrolling on the page, and it maintains perfect syntax highlighting thanks to proper CSS class application.
-
-**Code Example:**
-
-```tsx title="code-expand-button.tsx" caption="Expand button implementation" showLineNumbers
-export function CodeExpandButton({ code, preElement, language, title }: Props) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [codeHtml, setCodeHtml] = useState<string>('')
-
-  useEffect(() => {
-    if (isExpanded && preElement) {
-      // Clone the pre element deeply to preserve syntax highlighting
-      const clonedPre = preElement.cloneNode(true) as HTMLElement
-      
-      // Remove button containers to avoid duplicates
-      const buttonContainers = clonedPre.querySelectorAll('div')
-      buttonContainers.forEach((div) => {
-        const style = div.getAttribute('style')
-        if (style?.includes('position: absolute')) {
-          div.remove()
-        }
-      })
-      
-      // Remove data attributes to prevent CSS pseudo-elements
-      clonedPre.removeAttribute('data-title')
-      clonedPre.removeAttribute('data-caption')
-      
-      setCodeHtml(clonedPre.outerHTML)
-    }
-  }, [isExpanded, preElement])
-
-  return (
-    <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
-      <DialogContent className="max-w-6xl max-h-[90vh]">
-        <DialogTitle>{title || `Code (${language})`}</DialogTitle>
-        <div 
-          className="prose dark:prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ __html: codeHtml }}
-        />
-      </DialogContent>
-    </Dialog>
-  )
+```typescript title="example.ts" {3-5} showLineNumbers
+// This is a regular line
+function greet(name: string) {
+  // These lines are highlighted
+  console.log(`Hello, ${name}!`)
+  return `Welcome, ${name}`
 }
-```
 
-Try clicking the expand button (⛶) on the code block above to see it in action!
+greet('World')
+```
 
 ### 2. File Tree Component
 
-A new interactive file tree component helps visualize project structures in blog posts with an elegant expand feature for better readability.
-
-**Features:**
-
-- **Interactive Folders** - Click to expand/collapse directory structures
-- **Expand to Modal** - Full-screen view with backdrop effect for complex structures
-- **File Type Icons** - Automatic icon detection for TypeScript, JavaScript, JSON, YAML, Markdown, and more
-- **Syntax-Aware Styling** - Different colors for different file types
-- **Nested Structures** - Support for deeply nested directory hierarchies
-- **Comments Support** - Add descriptive comments to files
-
-**Expand Feature:**
-
-The expand button (⛶) in the top-right corner of any file tree opens a modal dialog with:
-- **Large viewport** - 85% of screen height for comfortable viewing
-- **Backdrop effect** - Semi-transparent black overlay (80% opacity)
-- **Smooth animations** - Fade and zoom transitions
-- **Scrollable content** - Handle large directory structures
-- **Keyboard navigation** - Press Escape to close, Tab for navigation
-- **Click outside to close** - Intuitive UX pattern
-
-Try clicking the expand button below to see it in action:
+A new file tree component helps visualize project structures in blog posts:
 
 <FileTree title="Project Structure">
   <FileTreeFolder name="src" defaultOpen>
     <FileTreeFolder name="app">
-      <FileTreeFile name="layout.tsx" comment="Root layout with theme provider" />
-      <FileTreeFile name="page.tsx" comment="Home page" />
-      <FileTreeFolder name="blog">
-        <FileTreeFolder name="[slugOrPage]">
-          <FileTreeFile name="page.tsx" comment="Dynamic blog post routes" />
-        </FileTreeFolder>
-      </FileTreeFolder>
+      <FileTreeFile name="layout.tsx" />
+      <FileTreeFile name="page.tsx" />
     </FileTreeFolder>
     <FileTreeFolder name="components">
       <FileTreeFile name="header.tsx" />
       <FileTreeFile name="footer.tsx" />
-      <FileTreeFile name="file-tree.tsx" comment="This component!" />
-      <FileTreeFile name="table-of-contents.tsx" />
-      <FileTreeFolder name="ui">
-        <FileTreeFile name="button.tsx" />
-        <FileTreeFile name="dialog.tsx" />
-        <FileTreeFile name="command.tsx" />
-      </FileTreeFolder>
-    </FileTreeFolder>
-    <FileTreeFolder name="lib">
-      <FileTreeFile name="content.ts" comment="Content loading utilities" />
-      <FileTreeFile name="mdx.ts" comment="MDX processing" />
-      <FileTreeFile name="utils.ts" />
     </FileTreeFolder>
   </FileTreeFolder>
   <FileTreeFile name="package.json" />
-  <FileTreeFile name="pnpm-workspace.yaml" />
-  <FileTreeFile name="tsconfig.json" />
+  <FileTreeFile name="pmpm-workspace.yaml" />
+  <FileTreeFile name="content.md" />
 </FileTree>
-
-**Implementation:**
-
-```tsx title="file-tree.tsx" caption="Expand feature implementation" showLineNumbers
-export function FileTree({ children, title }: FileTreeProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  return (
-    <div className="rounded-lg border bg-card">
-      {title && (
-        <div className="border-b bg-muted/50 px-4 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FolderOpen className="h-4 w-4" />
-              {title}
-            </div>
-            <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[85vh]">
-                <DialogHeader>
-                  <DialogTitle>{title || "Project Structure"}</DialogTitle>
-                </DialogHeader>
-                <div className="overflow-y-auto flex-1">
-                  {/* File tree content */}
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      )}
-      {/* File tree content */}
-    </div>
-  )
-}
-```
-
-The component uses Radix UI Dialog for accessibility and includes proper ARIA labels, keyboard navigation, and focus management.
 
 ### 3. Command Palette Search
 
@@ -505,124 +318,34 @@ Integrated Vercel Analytics for:
 
 ## Code Organization
 
-The project follows Next.js App Router conventions with a clean separation of concerns:
-
-<FileTree title="Next.js Blog Structure">
-  <FileTreeFolder name="src" defaultOpen>
-    <FileTreeFolder name="app" defaultOpen>
-      <FileTreeFile name="layout.tsx" comment="Root layout with theme provider" />
-      <FileTreeFile name="page.tsx" comment="Home page" />
-      <FileTreeFile name="globals.css" comment="Global styles and Shiki CSS" />
-      <FileTreeFolder name="blog">
-        <FileTreeFolder name="[slugOrPage]">
-          <FileTreeFile name="page.tsx" comment="Dynamic blog routes with pagination" />
-        </FileTreeFolder>
-      </FileTreeFolder>
-      <FileTreeFolder name="authors">
-        <FileTreeFolder name="[slug]">
-          <FileTreeFile name="page.tsx" comment="Author profile pages" />
-        </FileTreeFolder>
-        <FileTreeFile name="page.tsx" comment="Authors listing" />
-      </FileTreeFolder>
-      <FileTreeFolder name="tags">
-        <FileTreeFolder name="[slug]">
-          <FileTreeFile name="page.tsx" comment="Tag-filtered posts" />
-        </FileTreeFolder>
-        <FileTreeFile name="page.tsx" comment="Tags listing" />
-      </FileTreeFolder>
-      <FileTreeFolder name="projects">
-        <FileTreeFile name="page.tsx" comment="Projects showcase" />
-      </FileTreeFolder>
-      <FileTreeFolder name="llms.txt">
-        <FileTreeFile name="route.ts" comment="LLM-readable site info" />
-      </FileTreeFolder>
-      <FileTreeFolder name="rss.xml">
-        <FileTreeFile name="route.ts" comment="RSS feed generation" />
-      </FileTreeFolder>
-    </FileTreeFolder>
-    <FileTreeFolder name="components">
-      <FileTreeFolder name="ui" defaultOpen>
-        <FileTreeFile name="button.tsx" comment="shadcn/ui button" />
-        <FileTreeFile name="dialog.tsx" comment="Modal dialogs" />
-        <FileTreeFile name="command.tsx" comment="Command palette" />
-        <FileTreeFile name="collapsible.tsx" />
-        <FileTreeFile name="scroll-area.tsx" />
-      </FileTreeFolder>
-      <FileTreeFile name="header.tsx" comment="Site navigation" />
-      <FileTreeFile name="footer.tsx" comment="Site footer" />
-      <FileTreeFile name="file-tree.tsx" comment="Interactive file tree with expand" />
-      <FileTreeFile name="table-of-contents.tsx" comment="ToC with active tracking" />
-      <FileTreeFile name="command-menu.tsx" comment="Search command palette" />
-      <FileTreeFile name="scroll-to-top.tsx" comment="Floating scroll button" />
-      <FileTreeFile name="code-block-wrapper.tsx" comment="Code button orchestrator" />
-      <FileTreeFile name="code-copy-button.tsx" comment="Copy to clipboard" />
-      <FileTreeFile name="code-expand-button.tsx" comment="Expand to modal" />
-      <FileTreeFile name="theme-provider.tsx" comment="Theme context" />
-      <FileTreeFile name="theme-toggle.tsx" comment="Theme switcher" />
-      <FileTreeFile name="breadcrumbs.tsx" />
-      <FileTreeFile name="blog-card-with-image.tsx" />
-      <FileTreeFile name="post-navigation.tsx" />
-    </FileTreeFolder>
-    <FileTreeFolder name="lib">
-      <FileTreeFile name="content.ts" comment="MDX file loading and parsing" />
-      <FileTreeFile name="mdx.ts" comment="MDX processing utilities" />
-      <FileTreeFile name="authors.ts" comment="Author data handling" />
-      <FileTreeFile name="toc.ts" comment="Table of contents extraction" />
-      <FileTreeFile name="search.ts" comment="Search functionality" />
-      <FileTreeFile name="structured-data.ts" comment="JSON-LD generation" />
-      <FileTreeFile name="rehype-code-copy.ts" comment="Code copy plugin" />
-      <FileTreeFile name="rehype-code-meta.ts" comment="Code metadata plugin" />
-      <FileTreeFile name="utils.ts" comment="Utility functions" />
-    </FileTreeFolder>
-    <FileTreeFolder name="config">
-      <FileTreeFile name="site.ts" comment="Site configuration and constants" />
-      <FileTreeFile name="code-themes.ts" comment="Shiki theme definitions" />
-      <FileTreeFile name="known-tags.ts" comment="Tag icon mappings" />
-    </FileTreeFolder>
-    <FileTreeFolder name="hooks">
-      <FileTreeFile name="use-mobile.tsx" comment="Mobile detection hook" />
-    </FileTreeFolder>
-  </FileTreeFolder>
-  <FileTreeFolder name="content">
-    <FileTreeFolder name="blog">
-      <FileTreeFile name="01-zx.mdx" />
-      <FileTreeFile name="02-github-automation.mdx" />
-      <FileTreeFile name="16-nextjs-migration.mdx" comment="This post!" />
-    </FileTreeFolder>
-    <FileTreeFolder name="authors">
-      <FileTreeFile name="vitalics.md" />
-    </FileTreeFolder>
-    <FileTreeFolder name="projects">
-      <FileTreeFile name="rslike.md" />
-      <FileTreeFile name="ajv-ts.md" />
-    </FileTreeFolder>
-  </FileTreeFolder>
-  <FileTreeFolder name="public">
-    <FileTreeFolder name="tags">
-      <FileTreeFile name="typescript.svg" />
-      <FileTreeFile name="nextjs.svg" />
-      <FileTreeFile name="astro.svg" />
-    </FileTreeFolder>
-    <FileTreeFolder name="blog">
-      <FileTreeFile name="..." comment="Blog post images" />
-    </FileTreeFolder>
-  </FileTreeFolder>
-  <FileTreeFile name="package.json" />
-  <FileTreeFile name="next.config.ts" comment="Next.js configuration" />
-  <FileTreeFile name="tailwind.config.ts" comment="Tailwind CSS v4 config" />
-  <FileTreeFile name="tsconfig.json" comment="TypeScript configuration" />
-  <FileTreeFile name="biome.json" comment="Biome linter config" />
-  <FileTreeFile name="vercel.json" comment="Vercel deployment config" />
-</FileTree>
-
-**Key Highlights:**
-
-- **App Router Structure** - Follows Next.js 16 conventions with server components
-- **Component Organization** - UI primitives separate from feature components
-- **Plugin System** - Custom rehype plugins for code enhancement
-- **Type Safety** - Full TypeScript coverage across the codebase
-- **Configuration Files** - Centralized in `config/` directory
-- **Content Management** - MDX files in dedicated `content/` directory
+```
+src/
+├── app/
+│   ├── layout.tsx           # Root layout
+│   ├── page.tsx             # Home page
+│   ├── blog/
+│   │   └── [slugOrPage]/    # Dynamic blog routes
+│   ├── authors/             # Author pages
+│   ├── tags/                # Tag pages
+│   └── llms.txt/            # LLM support
+├── components/
+│   ├── ui/                  # shadcn/ui components
+│   ├── header.tsx
+│   ├── footer.tsx
+│   ├── table-of-contents.tsx
+│   ├── command-menu.tsx
+│   ├── scroll-to-top.tsx
+│   └── ...
+├── lib/
+│   ├── content.ts           # Content loading
+│   ├── mdx.ts               # MDX processing
+│   ├── toc.ts               # ToC extraction
+│   ├── search.ts            # Search functionality
+│   └── ...
+└── config/
+    ├── site.ts              # Site configuration
+    └── code-themes.ts       # Code theme configs
+```
 
 ## Lessons Learned
 
