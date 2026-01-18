@@ -6,9 +6,18 @@ import {
   FolderOpen,
   ChevronRight,
   ChevronDown,
+  Maximize2,
 } from "lucide-react";
 import { createContext, useContext, ReactNode, useState } from "react";
 import Image from "next/image";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface FileTreeContextValue {
   level: number;
@@ -22,21 +31,52 @@ interface FileTreeProps {
 }
 
 export function FileTree({ children, title }: FileTreeProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const FileTreeContent = () => (
+    <div className="overflow-x-auto p-4 font-mono text-sm">
+      <FileTreeContext.Provider value={{ level: 0 }}>
+        {children}
+      </FileTreeContext.Provider>
+    </div>
+  );
+
   return (
     <div className="not-prose my-6 overflow-hidden rounded-lg border bg-card">
       {title && (
         <div className="border-b bg-muted/50 px-4 py-2">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <FolderOpen className="h-4 w-4" />
-            {title}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <FolderOpen className="h-4 w-4" />
+              {title}
+            </div>
+            <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  aria-label="Expand file tree"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5" />
+                    {title || "Project Structure"}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="overflow-y-auto flex-1 rounded-lg border bg-card">
+                  <FileTreeContent />
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       )}
-      <div className="overflow-x-auto p-4 font-mono text-sm">
-        <FileTreeContext.Provider value={{ level: 0 }}>
-          {children}
-        </FileTreeContext.Provider>
-      </div>
+      <FileTreeContent />
     </div>
   );
 }

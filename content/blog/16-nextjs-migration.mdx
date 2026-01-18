@@ -42,17 +42,68 @@ One of the most exciting additions is the advanced code highlighting system powe
 
 #### Multiple Code Themes
 
-Users can now choose from multiple code themes:
+One of the standout features is the comprehensive code theme system. Users can now personalize their reading experience by choosing from **13 carefully curated code themes**, each supporting both light and dark variants:
 
-- GitHub Light/Dark
-- Dracula
-- Nord
-- Tokyo Night
-- Material Theme
-- One Dark Pro
-- Synthwave 84
+| Theme | Light Variant | Dark Variant | Description |
+|-------|---------------|--------------|-------------|
+| **GitHub** | GitHub Light | GitHub Dark | Clean, minimal theme from GitHub |
+| **GitHub Dimmed** | GitHub Light | GitHub Dark Dimmed | Softer variant of GitHub's dark theme |
+| **One Dark Pro** | One Light | One Dark Pro | Popular Atom-inspired theme |
+| **Dracula** | GitHub Light | Dracula | Vibrant purple-based theme |
+| **Night Owl** | GitHub Light | Night Owl | Sarah Drasner's acclaimed theme |
+| **Monokai** | GitHub Light | Monokai | Classic Sublime Text theme |
+| **Nord** | GitHub Light | Nord | Arctic, north-bluish color palette |
+| **Catppuccin** | Catppuccin Latte | Catppuccin Mocha | Soothing pastel theme |
+| **Rosé Pine** | GitHub Light | Rosé Pine | All natural pine with a hint of soho vibes |
+| **Tokyo Night** | GitHub Light | Tokyo Night | Clean, elegant theme inspired by Tokyo's night |
+| **Material Theme** | Material Lighter | Material Darker | Google's Material Design palette |
+| **Vitesse** | Vitesse Light | Vitesse Dark | Anthony Fu's fast and minimal theme |
+| **Min** | Min Light | Min Dark | Minimalist, distraction-free theme |
 
-The theme selector is accessible via a dropdown in code blocks, and preferences are saved in cookies.
+**Key Features:**
+
+- **Automatic Theme Switching** - Code blocks automatically adapt to your system's light/dark mode
+- **Independent Selection** - Choose a code theme independent of your site theme
+- **Persistent Preferences** - Your choice is saved in cookies (1 year expiration)
+- **Smooth Transitions** - Themes switch seamlessly without page reload
+- **Dual Theme Support** - Each theme includes optimized light and dark variants
+- **Syntax Awareness** - Powered by Shiki for accurate syntax highlighting across 200+ languages
+
+**How It Works:**
+
+The theme selector is accessible via a dropdown in the top-right corner of any code block. When you select a theme:
+
+1. The preference is immediately saved to cookies (`blog-code-theme`)
+2. All code blocks on the page update instantly
+3. The theme persists across page navigation
+4. Light/dark variants switch automatically based on your system theme
+
+```typescript title="code-themes.ts" caption="Example of theme configuration" showLineNumbers
+export interface CodeTheme {
+  name: string        // Internal identifier
+  label: string       // Display name
+  light: string       // Shiki light theme
+  dark: string        // Shiki dark theme
+}
+
+export const CODE_THEMES: Record<string, CodeTheme> = {
+  github: {
+    name: 'github',
+    label: 'GitHub',
+    light: 'github-light',
+    dark: 'github-dark',
+  },
+  dracula: {
+    name: 'dracula',
+    label: 'Dracula',
+    light: 'github-light',
+    dark: 'dracula',
+  },
+  // ... more themes
+}
+```
+
+The implementation uses server-side rendering with cookie-based preferences, ensuring there's no flash of unstyled code on page load.
 
 ```typescript title="theme-selector.tsx" showLineNumbers
 'use client'
@@ -99,23 +150,102 @@ greet('World')
 
 ### 2. File Tree Component
 
-A new file tree component helps visualize project structures in blog posts:
+A new interactive file tree component helps visualize project structures in blog posts with an elegant expand feature for better readability.
+
+**Features:**
+
+- **Interactive Folders** - Click to expand/collapse directory structures
+- **Expand to Modal** - Full-screen view with backdrop effect for complex structures
+- **File Type Icons** - Automatic icon detection for TypeScript, JavaScript, JSON, YAML, Markdown, and more
+- **Syntax-Aware Styling** - Different colors for different file types
+- **Nested Structures** - Support for deeply nested directory hierarchies
+- **Comments Support** - Add descriptive comments to files
+
+**Expand Feature:**
+
+The expand button (⛶) in the top-right corner of any file tree opens a modal dialog with:
+- **Large viewport** - 85% of screen height for comfortable viewing
+- **Backdrop effect** - Semi-transparent black overlay (80% opacity)
+- **Smooth animations** - Fade and zoom transitions
+- **Scrollable content** - Handle large directory structures
+- **Keyboard navigation** - Press Escape to close, Tab for navigation
+- **Click outside to close** - Intuitive UX pattern
+
+Try clicking the expand button below to see it in action:
 
 <FileTree title="Project Structure">
   <FileTreeFolder name="src" defaultOpen>
     <FileTreeFolder name="app">
-      <FileTreeFile name="layout.tsx" />
-      <FileTreeFile name="page.tsx" />
+      <FileTreeFile name="layout.tsx" comment="Root layout with theme provider" />
+      <FileTreeFile name="page.tsx" comment="Home page" />
+      <FileTreeFolder name="blog">
+        <FileTreeFolder name="[slugOrPage]">
+          <FileTreeFile name="page.tsx" comment="Dynamic blog post routes" />
+        </FileTreeFolder>
+      </FileTreeFolder>
     </FileTreeFolder>
     <FileTreeFolder name="components">
       <FileTreeFile name="header.tsx" />
       <FileTreeFile name="footer.tsx" />
+      <FileTreeFile name="file-tree.tsx" comment="This component!" />
+      <FileTreeFile name="table-of-contents.tsx" />
+      <FileTreeFolder name="ui">
+        <FileTreeFile name="button.tsx" />
+        <FileTreeFile name="dialog.tsx" />
+        <FileTreeFile name="command.tsx" />
+      </FileTreeFolder>
+    </FileTreeFolder>
+    <FileTreeFolder name="lib">
+      <FileTreeFile name="content.ts" comment="Content loading utilities" />
+      <FileTreeFile name="mdx.ts" comment="MDX processing" />
+      <FileTreeFile name="utils.ts" />
     </FileTreeFolder>
   </FileTreeFolder>
   <FileTreeFile name="package.json" />
-  <FileTreeFile name="pmpm-workspace.yaml" />
-  <FileTreeFile name="content.md" />
+  <FileTreeFile name="pnpm-workspace.yaml" />
+  <FileTreeFile name="tsconfig.json" />
 </FileTree>
+
+**Implementation:**
+
+```tsx title="file-tree.tsx" caption="Expand feature implementation" showLineNumbers
+export function FileTree({ children, title }: FileTreeProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  return (
+    <div className="rounded-lg border bg-card">
+      {title && (
+        <div className="border-b bg-muted/50 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              {title}
+            </div>
+            <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[85vh]">
+                <DialogHeader>
+                  <DialogTitle>{title || "Project Structure"}</DialogTitle>
+                </DialogHeader>
+                <div className="overflow-y-auto flex-1">
+                  {/* File tree content */}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      )}
+      {/* File tree content */}
+    </div>
+  )
+}
+```
+
+The component uses Radix UI Dialog for accessibility and includes proper ARIA labels, keyboard navigation, and focus management.
 
 ### 3. Command Palette Search
 
