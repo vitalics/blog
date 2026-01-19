@@ -49,13 +49,18 @@ export function ThemeProvider({
   const [themeName, setThemeNameState] = useState<string>('default')
   const [codeTheme, setCodeThemeState] = useState<string>('github')
   const [fontSize, setFontSizeState] = useState<string>('medium')
-  const [fontFamily, setFontFamilyState] = useState<string>('geist')
-  const [codeFontFamily, setCodeFontFamilyState] = useState<string>('geist-mono')
+  const [fontFamily, setFontFamilyState] = useState<string>('system')
+  const [codeFontFamily, setCodeFontFamilyState] = useState<string>('mono')
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    
+    // Check if this is the user's first visit
+    const hasVisitedBefore = localStorage.getItem('blog-has-visited')
+    const isFirstVisit = !hasVisitedBefore
+    
     // Get theme from localStorage
     const stored = localStorage.getItem(storageKey) as Theme | null
     if (stored) {
@@ -80,16 +85,30 @@ export function ThemeProvider({
       setFontSizeState(storedFontSize)
     }
     
-    // Get font family from localStorage
+    // Get font family from localStorage or set default for first-time users
     const storedFontFamily = localStorage.getItem(fontFamilyStorageKey)
     if (storedFontFamily) {
       setFontFamilyState(storedFontFamily)
+    } else if (isFirstVisit) {
+      // Set system default for first-time users
+      setFontFamilyState('system')
+      localStorage.setItem(fontFamilyStorageKey, 'system')
     }
     
-    // Get code font family from localStorage
+    // Get code font family from localStorage or set default for first-time users
     const storedCodeFontFamily = localStorage.getItem(codeFontFamilyStorageKey)
     if (storedCodeFontFamily) {
       setCodeFontFamilyState(storedCodeFontFamily)
+    } else if (isFirstVisit) {
+      // Set system mono for first-time users
+      setCodeFontFamilyState('mono')
+      localStorage.setItem(codeFontFamilyStorageKey, 'mono')
+    }
+    
+    // Mark that the user has visited
+    if (isFirstVisit) {
+      localStorage.setItem('blog-has-visited', 'true')
+      console.log('👋 Welcome! Default fonts set to System Default & System Mono for better compatibility.')
     }
   }, [storageKey, themeNameStorageKey, codeThemeStorageKey, fontSizeStorageKey, fontFamilyStorageKey, codeFontFamilyStorageKey])
 
