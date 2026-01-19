@@ -22,6 +22,11 @@ const CodeThemeSelector = dynamic(() => import('@/components/code-theme-selector
   loading: () => <div className="h-9 w-9" />,
 })
 
+const FontSizeSelector = dynamic(() => import('@/components/font-size-selector').then(mod => ({ default: mod.FontSizeSelector })), {
+  ssr: false,
+  loading: () => <div className="h-9 w-9" />,
+})
+
 export function Header() {
   const handleSearchClick = () => {
     const event = new KeyboardEvent('keydown', {
@@ -76,6 +81,7 @@ export function Header() {
               <span className="text-xs">⌘</span>K
             </kbd>
           </button>
+          <FontSizeSelector />
           <CodeThemeSelector />
           <ThemeSelector />
           <ThemeToggle />

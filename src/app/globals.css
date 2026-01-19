@@ -59,11 +59,13 @@
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
+  font-size: var(--base-font-size);
 }
 
 /* Prose styles for MDX content */
 .prose {
   @apply text-foreground;
+  font-size: var(--base-font-size);
 }
 
 .prose :where(a):not(:where([class~="not-prose"] *)) {
@@ -75,7 +77,8 @@ body {
 }
 
 .prose :where(code):not(:where([class~="not-prose"] *)):not(:where(pre *)) {
-  @apply relative rounded border bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold text-foreground;
+  @apply relative rounded border bg-muted px-[0.3rem] py-[0.2rem] font-mono font-semibold text-foreground;
+  font-size: 0.875em;
 }
 
 .prose :where(pre):not(:where([class~="not-prose"] *)) {
@@ -88,7 +91,8 @@ body {
 }
 
 .prose :where(pre code):not(:where([class~="not-prose"] *)) {
-  @apply bg-transparent p-0 text-sm;
+  @apply bg-transparent p-0;
+  font-size: 0.875em;
 }
 
 .prose :where(blockquote):not(:where([class~="not-prose"] *)) {
@@ -150,7 +154,7 @@ body {
 /* Shiki code block styles */
 .prose pre[class*="language-"],
 .prose code[class*="language-"] {
-  @apply text-sm;
+  font-size: 0.875em;
 }
 
 /* Use Shiki's CSS variables for dual theme support */
@@ -243,6 +247,7 @@ body {
 }
 
 :root {
+  --base-font-size: 16px;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

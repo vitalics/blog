@@ -11,6 +11,7 @@ type ThemeProviderProps = {
   storageKey?: string
   themeNameStorageKey?: string
   codeThemeStorageKey?: string
+  fontSizeStorageKey?: string
 }
 
 type ThemeProviderState = {
@@ -21,6 +22,8 @@ type ThemeProviderState = {
   setThemeName: (name: string) => void
   codeTheme: string
   setCodeTheme: (name: string) => void
+  fontSize: string
+  setFontSize: (size: string) => void
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined)
@@ -31,11 +34,13 @@ export function ThemeProvider({
   storageKey = 'blog-theme',
   themeNameStorageKey = 'blog-theme-name',
   codeThemeStorageKey = 'blog-code-theme',
+  fontSizeStorageKey = 'blog-font-size',
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme)
   const [themeName, setThemeNameState] = useState<string>('default')
   const [codeTheme, setCodeThemeState] = useState<string>('github')
+  const [fontSize, setFontSizeState] = useState<string>('medium')
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
   const [mounted, setMounted] = useState(false)
 
@@ -58,7 +63,13 @@ export function ThemeProvider({
     if (storedCodeTheme) {
       setCodeThemeState(storedCodeTheme)
     }
-  }, [storageKey, themeNameStorageKey, codeThemeStorageKey])
+    
+    // Get font size from localStorage
+    const storedFontSize = localStorage.getItem(fontSizeStorageKey)
+    if (storedFontSize) {
+      setFontSizeState(storedFontSize)
+    }
+  }, [storageKey, themeNameStorageKey, codeThemeStorageKey, fontSizeStorageKey])
 
   useEffect(() => {
     if (!mounted) return
@@ -99,6 +110,22 @@ export function ThemeProvider({
     const root = window.document.documentElement
     root.setAttribute('data-code-theme', codeTheme)
   }, [codeTheme, mounted])
+  
+  // Update font size
+  useEffect(() => {
+    if (!mounted) return
+    const root = window.document.documentElement
+    
+    const fontSizeMap: Record<string, string> = {
+      small: '14px',
+      medium: '16px',
+      large: '18px',
+      'x-large': '20px',
+    }
+    
+    root.style.setProperty('--base-font-size', fontSizeMap[fontSize] || '16px')
+    root.setAttribute('data-font-size', fontSize)
+  }, [fontSize, mounted])
 
   useEffect(() => {
     if (!mounted) return
@@ -134,6 +161,11 @@ export function ThemeProvider({
     localStorage.setItem(codeThemeStorageKey, name)
     setCodeThemeState(name)
   }
+  
+  const setFontSize = (size: string) => {
+    localStorage.setItem(fontSizeStorageKey, size)
+    setFontSizeState(size)
+  }
 
   const value = {
     theme,
@@ -143,6 +175,8 @@ export function ThemeProvider({
     setThemeName,
     codeTheme,
     setCodeTheme,
+    fontSize,
+    setFontSize,
   }
 
   return (
