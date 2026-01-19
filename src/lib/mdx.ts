@@ -36,6 +36,19 @@ export async function getMDXContent(type: 'blog' | 'authors' | 'projects', slug:
             dark: 'github-dark-dimmed',
             light: 'github-light',
           },
+          keepBackground: false,
+          onVisitLine(node: any) {
+            // Prevent lines from collapsing in `display: grid` mode
+            if (node.children.length === 0) {
+              node.children = [{ type: 'text', value: ' ' }]
+            }
+          },
+          onVisitHighlightedLine(node: any) {
+            node.properties.className = ['line--highlighted']
+          },
+          onVisitHighlightedChars(node: any) {
+            node.properties.className = ['word--highlighted']
+          },
         },
       ],
     ],

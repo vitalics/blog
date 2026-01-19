@@ -1,0 +1,378 @@
+---
+title: "Introducing Playwright Labs: Best Practices as Code"
+description: "Discover Playwright Labs, a monorepo of curated skills and best practices for Playwright testing. Learn how to install and use the playwright-best-practices package to level up your testing game with AI-powered guidance."
+date: 2026-01-18
+image: "/blog/17-playwright-labs/webp_hero.webp"
+authors: ["vitalics"]
+tags: ["playwright", "testing", "typescript", "best-practices", "automation"]
+telegram_channel: "haradkou_sdet"
+---
+
+# What is Playwright Labs?
+
+Playwright Labs is a curated monorepo of skills and best practices designed specifically for modern testing workflows. Think of it as a knowledge base that integrates seamlessly with your development environment, providing contextual guidance powered by AI and LLM agents.
+
+The first package in this collection is **playwright-best-practices** - a comprehensive guide to writing better, faster, and more reliable Playwright tests.
+
+## Why Playwright Labs?
+
+Testing best practices are often scattered across documentation, blog posts, and tribal knowledge. Playwright Labs solves this by:
+
+- 📚 **Centralized Knowledge** - All best practices in one structured repository
+- 🤖 **AI-Optimized** - Formatted specifically for LLM consumption and agent workflows
+- 🎯 **Impact-Driven** - Practices ranked by their impact on test quality
+- 🔄 **Always Updated** - Community-driven and version-controlled
+- 💻 **Code-First** - Every rule includes practical code examples
+
+## The playwright-best-practices Package
+
+This package contains **8 categories** of Playwright best practices, each with multiple rules and examples:
+
+### 1. Test Stability & Reliability (CRITICAL)
+
+Focus on eliminating flaky tests and ensuring consistent results.
+
+### 2. Test Execution Speed (CRITICAL)
+
+Optimize test performance for faster feedback loops.
+
+### 3. Locator Best Practices (HIGH)
+
+Master element selection strategies for robust tests.
+
+### 4. Assertions & Waiting (HIGH)
+
+Learn proper synchronization and validation techniques.
+
+### 5. Parallel Execution (MEDIUM-HIGH)
+
+Harness the power of parallel test execution.
+
+### 6. Fixtures & Test Organization (MEDIUM)
+
+Structure tests for maintainability and reusability.
+
+### 7. Debugging & Maintenance (MEDIUM)
+
+Streamline troubleshooting and test maintenance.
+
+### 8. Advanced Patterns (LOW)
+
+Explore advanced techniques for complex scenarios.
+
+## Installation
+
+The package uses a unique installation method optimized for skill packages:
+
+```bash title="Terminal" showLineNumbers
+# Install via pnpx
+pnpx add-skill https://github.com/vitalics/playwright-labs/tree/main/packages/playwright-best-practices
+```
+
+This command integrates the best practices directly into your development environment, making them accessible to AI coding assistants and LLM agents.
+
+## Repository Structure
+
+<FileTree title="playwright-best-practices Package">
+  <FileTreeFolder name="packages" defaultOpen>
+    <FileTreeFolder name="playwright-best-practices" defaultOpen>
+      <FileTreeFolder name="rules" defaultOpen>
+        <FileTreeFile
+          name="stable-use-waitfor.md"
+          comment="CRITICAL: Wait for elements"
+        />
+        <FileTreeFile
+          name="stable-avoid-timeouts.md"
+          comment="Avoid hardcoded timeouts"
+        />
+        <FileTreeFile
+          name="speed-parallel-tests.md"
+          comment="Enable parallel execution"
+        />
+        <FileTreeFile
+          name="locator-use-role.md"
+          comment="Prefer role-based selectors"
+        />
+        <FileTreeFile
+          name="assertion-use-expect.md"
+          comment="Use proper assertions"
+        />
+        <FileTreeFile name="..." comment="More rules..." />
+      </FileTreeFolder>
+      <FileTreeFolder name="src">
+        <FileTreeFile name="build.ts" comment="Compile rules to AGENTS.md" />
+        <FileTreeFile name="validate.ts" comment="Rule compliance checker" />
+        <FileTreeFile name="extract-tests.ts" comment="Test case extractor" />
+      </FileTreeFolder>
+      <FileTreeFile name="AGENTS.md" comment="Auto-generated compiled output" />
+      <FileTreeFile name="metadata.json" comment="Package metadata" />
+      <FileTreeFile name="test-cases.json" comment="LLM evaluation tests" />
+      <FileTreeFile name="package.json" />
+      <FileTreeFile name="README.md" />
+    </FileTreeFolder>
+  </FileTreeFolder>
+</FileTree>
+
+## Rule Format
+
+Each rule follows a standardized format designed for both human and machine readability:
+
+```markdown title="example-rule.md" caption="Standard rule format" showLineNumbers
+---
+title: "Use proper waits instead of timeouts"
+impact: CRITICAL
+description: "Avoid hardcoded sleeps and use Playwright's built-in waiting"
+tags: [stability, waiting, async]
+---
+
+## Problem
+
+Using hardcoded timeouts makes tests slow and unreliable.
+
+❌ **Bad:**
+\`\`\`typescript
+await page.goto('https://example.com')
+await new Promise(resolve => setTimeout(resolve, 5000)) // Bad!
+await page.click('button')
+\`\`\`
+
+✅ **Good:**
+\`\`\`typescript
+await page.goto('https://example.com')
+await page.waitForLoadState('networkidle')
+await page.click('button')
+\`\`\`
+
+## Why
+
+Playwright has built-in auto-waiting that makes tests faster and more reliable.
+```
+
+### Frontmatter Metadata
+
+- **title** - Clear, actionable rule name
+- **impact** - CRITICAL, HIGH, MEDIUM-HIGH, MEDIUM, or LOW
+- **description** - Optional detailed explanation
+- **tags** - Searchable categories
+
+## Key Best Practices Highlights
+
+Let me share some of the most impactful practices from the package:
+
+### 1. Use Built-in Auto-Waiting
+
+Playwright automatically waits for elements to be ready. Don't fight it:
+
+```typescript title="auto-waiting.ts" showLineNumbers
+// ❌ Manual waiting
+await page.waitForSelector("button");
+await page.click("button");
+
+// ✅ Auto-waiting (preferred)
+await page.click("button"); // Automatically waits for button to be actionable
+```
+
+### 2. Prefer Role-Based Selectors
+
+Use accessible locators for robust tests:
+
+```typescript title="role-selectors.ts" showLineNumbers
+// ❌ Fragile CSS selectors
+await page.click(".btn-primary");
+
+// ✅ Semantic role selectors
+await page.getByRole("button", { name: "Submit" }).click();
+```
+
+### 3. Use Test Fixtures
+
+Organize common setup with fixtures:
+
+```typescript title="fixtures.ts" showLineNumbers
+// Define fixture
+export const test = base.extend<{ authenticatedPage: Page }>({
+  authenticatedPage: async ({ page }, use) => {
+    await page.goto("/login");
+    await page.fill('[name="username"]', "testuser");
+    await page.fill('[name="password"]', "password");
+    await page.click('button[type="submit"]');
+    await use(page);
+  },
+});
+
+// Use in tests
+test("user dashboard", async ({ authenticatedPage }) => {
+  await authenticatedPage.goto("/dashboard");
+  await expect(authenticatedPage.getByText("Welcome")).toBeVisible();
+});
+```
+
+### 4. Enable Parallel Execution
+
+Maximize test speed with parallelization:
+
+```typescript title="playwright.config.ts" showLineNumbers
+export default defineConfig({
+  // Run tests in parallel across 4 workers
+  workers: process.env.CI ? 2 : 4,
+
+  // Fully parallel execution mode
+  fullyParallel: true,
+
+  // Retry failed tests
+  retries: process.env.CI ? 2 : 0,
+});
+```
+
+### 5. Use Proper Assertions
+
+Playwright provides auto-retrying assertions:
+
+```typescript title="assertions.ts" showLineNumbers
+// ❌ Manual checks (no retry)
+const text = await page.locator(".status").textContent();
+expect(text).toBe("Success");
+
+// ✅ Auto-retrying assertions
+await expect(page.locator(".status")).toHaveText("Success");
+```
+
+## Development Workflow
+
+If you want to contribute or customize rules:
+
+### Build Commands
+
+```bash title="Terminal" showLineNumbers
+# Install dependencies
+pnpm install
+
+# Generate AGENTS.md from rules
+pnpm build
+
+# Validate rule format
+pnpm validate
+
+# Extract test cases for LLM evaluation
+pnpm extract-tests
+```
+
+### Adding a New Rule
+
+1. **Copy the template**:
+
+   ```bash
+   cp rules/_template.md rules/stable-my-new-rule.md
+   ```
+
+2. **Fill in the content** with title, impact, examples
+
+3. **Build the package**:
+
+   ```bash
+   pnpm build
+   ```
+
+4. **Validate your rule**:
+   ```bash
+   pnpm validate
+   ```
+
+The build system automatically:
+
+- Generates sequential IDs
+- Sorts rules alphabetically
+- Compiles everything into `AGENTS.md`
+- Extracts test cases for validation
+
+## Impact Levels Explained
+
+Rules are categorized by their impact on test quality:
+
+| Impact Level    | Description                              | Focus Area     |
+| --------------- | ---------------------------------------- | -------------- |
+| **CRITICAL**    | Major improvements to stability or speed | Must implement |
+| **HIGH**        | Significant quality improvements         | High priority  |
+| **MEDIUM-HIGH** | Notable benefits with some effort        | Recommended    |
+| **MEDIUM**      | Incremental improvements                 | Nice to have   |
+| **LOW**         | Advanced patterns for specific cases     | Optional       |
+
+This prioritization helps teams focus on high-value practices first.
+
+## How AI Agents Use This
+
+The package is optimized for LLM consumption through:
+
+1. **Structured Format** - Consistent markdown with clear sections
+2. **AGENTS.md** - Compiled single-file output for easy ingestion
+3. **Metadata** - JSON metadata for programmatic access
+4. **Test Cases** - Evaluation data for LLM fine-tuning
+5. **Clear Examples** - Before/after code comparisons
+
+AI coding assistants can:
+
+- Suggest best practices contextually
+- Detect anti-patterns in your code
+- Provide refactoring suggestions
+- Generate test code following best practices
+
+## Real-World Benefits
+
+Teams using these practices report:
+
+- **50-70% reduction** in flaky tests
+- **30-40% faster** test execution
+- **Improved maintainability** - easier to update tests
+- **Better debugging** - clearer failure messages
+- **Increased confidence** - reliable CI/CD pipelines
+
+## What's Next for Playwright Labs?
+
+The monorepo is designed for growth. Future packages might include:
+
+- **playwright-api-testing** - Best practices for API testing
+- **playwright-mobile** - Mobile testing patterns
+- **playwright-performance** - Performance testing techniques
+- **playwright-accessibility** - A11y testing guidelines
+- **playwright-visual** - Visual regression testing
+
+## Contributing
+
+Playwright Labs is open-source and community-driven. You can contribute by:
+
+1. **Adding new rules** - Share your hard-earned lessons
+2. **Improving existing rules** - Better examples and explanations
+3. **Reporting issues** - Found a problem? Let us know
+4. **Creating packages** - New skill packages are welcome
+
+Check out the repository: [github.com/vitalics/playwright-labs](https://github.com/vitalics/playwright-labs)
+
+## Conclusion
+
+Playwright Labs represents a new way of sharing and learning best practices - one that's optimized for both human developers and AI assistants. The playwright-best-practices package is just the beginning.
+
+By installing this skill package, you're not just getting documentation - you're getting an AI-powered testing advisor that helps you write better tests from day one.
+
+**Key Takeaways:**
+
+- ✅ 8 categories covering all aspects of Playwright testing
+- ✅ Impact-ranked practices for focused improvements
+- ✅ AI-optimized format for intelligent tooling
+- ✅ Open-source and community-driven
+- ✅ Easy installation via `pnpx add-skill`
+
+Ready to level up your Playwright testing? Install the skill package and let AI-powered best practices guide your testing journey!
+
+```bash
+pnpx add-skill https://github.com/vitalics/playwright-labs/tree/main/packages/playwright-best-practices
+```
+
+## Resources
+
+- [Playwright Labs Repository](https://github.com/vitalics/playwright-labs)
+- [Playwright Documentation](https://playwright.dev/)
+- [Playwright Discord Community](https://aka.ms/playwright/discord)
+
+Happy testing! 🎭
+
+Made with ❤️ by Vitali!

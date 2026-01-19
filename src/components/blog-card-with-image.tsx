@@ -17,7 +17,7 @@ export function BlogCardWithImage({ post }: BlogCardWithImageProps) {
               src={post.image}
               alt={post.title}
               fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
               sizes="(max-width: 640px) 100vw, 256px"
             />
           </div>
@@ -49,11 +49,12 @@ export function BlogCardWithImage({ post }: BlogCardWithImageProps) {
 
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <time dateTime={post.date.toISOString()}>
-              {post.date.toLocaleDateString('en-US', {
+              {new Intl.DateTimeFormat('en-US', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
-              })}
+                timeZone: 'UTC',
+              }).format(post.date)}
             </time>
             <span>•</span>
             <span>{post.readingTime}</span>
