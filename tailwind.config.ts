@@ -7,7 +7,12 @@ const config: Config = {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['var(--base-font-family)', 'system-ui', 'sans-serif'],
+        mono: ['var(--code-font-family)', 'ui-monospace', 'monospace'],
+      },
+    },
   },
   plugins: [
     require('@tailwindcss/typography'),

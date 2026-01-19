@@ -27,6 +27,16 @@ const FontSizeSelector = dynamic(() => import('@/components/font-size-selector')
   loading: () => <div className="h-9 w-9" />,
 })
 
+const FontFamilySelector = dynamic(() => import('@/components/font-family-selector').then(mod => ({ default: mod.FontFamilySelector })), {
+  ssr: false,
+  loading: () => <div className="h-9 w-9" />,
+})
+
+const CodeFontFamilySelector = dynamic(() => import('@/components/code-font-family-selector').then(mod => ({ default: mod.CodeFontFamilySelector })), {
+  ssr: false,
+  loading: () => <div className="h-9 w-9" />,
+})
+
 export function Header() {
   const handleSearchClick = () => {
     const event = new KeyboardEvent('keydown', {
@@ -82,6 +92,8 @@ export function Header() {
             </kbd>
           </button>
           <FontSizeSelector />
+          <FontFamilySelector />
+          <CodeFontFamilySelector />
           <CodeThemeSelector />
           <ThemeSelector />
           <ThemeToggle />

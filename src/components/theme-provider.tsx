@@ -12,6 +12,8 @@ type ThemeProviderProps = {
   themeNameStorageKey?: string
   codeThemeStorageKey?: string
   fontSizeStorageKey?: string
+  fontFamilyStorageKey?: string
+  codeFontFamilyStorageKey?: string
 }
 
 type ThemeProviderState = {
@@ -24,6 +26,10 @@ type ThemeProviderState = {
   setCodeTheme: (name: string) => void
   fontSize: string
   setFontSize: (size: string) => void
+  fontFamily: string
+  setFontFamily: (family: string) => void
+  codeFontFamily: string
+  setCodeFontFamily: (family: string) => void
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined)
@@ -35,12 +41,16 @@ export function ThemeProvider({
   themeNameStorageKey = 'blog-theme-name',
   codeThemeStorageKey = 'blog-code-theme',
   fontSizeStorageKey = 'blog-font-size',
+  fontFamilyStorageKey = 'blog-font-family',
+  codeFontFamilyStorageKey = 'blog-code-font-family',
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme)
   const [themeName, setThemeNameState] = useState<string>('default')
   const [codeTheme, setCodeThemeState] = useState<string>('github')
   const [fontSize, setFontSizeState] = useState<string>('medium')
+  const [fontFamily, setFontFamilyState] = useState<string>('geist')
+  const [codeFontFamily, setCodeFontFamilyState] = useState<string>('geist-mono')
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
   const [mounted, setMounted] = useState(false)
 
@@ -69,7 +79,19 @@ export function ThemeProvider({
     if (storedFontSize) {
       setFontSizeState(storedFontSize)
     }
-  }, [storageKey, themeNameStorageKey, codeThemeStorageKey, fontSizeStorageKey])
+    
+    // Get font family from localStorage
+    const storedFontFamily = localStorage.getItem(fontFamilyStorageKey)
+    if (storedFontFamily) {
+      setFontFamilyState(storedFontFamily)
+    }
+    
+    // Get code font family from localStorage
+    const storedCodeFontFamily = localStorage.getItem(codeFontFamilyStorageKey)
+    if (storedCodeFontFamily) {
+      setCodeFontFamilyState(storedCodeFontFamily)
+    }
+  }, [storageKey, themeNameStorageKey, codeThemeStorageKey, fontSizeStorageKey, fontFamilyStorageKey, codeFontFamilyStorageKey])
 
   useEffect(() => {
     if (!mounted) return
@@ -126,6 +148,48 @@ export function ThemeProvider({
     root.style.setProperty('--base-font-size', fontSizeMap[fontSize] || '16px')
     root.setAttribute('data-font-size', fontSize)
   }, [fontSize, mounted])
+  
+  // Update font family
+  useEffect(() => {
+    if (!mounted) return
+    const root = window.document.documentElement
+    
+    const fontFamilyMap: Record<string, string> = {
+      geist: 'var(--font-geist-sans), Geist, sans-serif',
+      system: 'system-ui, -apple-system, sans-serif',
+      serif: 'Georgia, serif',
+      arial: 'Arial, sans-serif',
+      verdana: 'Verdana, sans-serif',
+      tahoma: 'Tahoma, sans-serif',
+    }
+    
+    root.style.setProperty('--base-font-family', fontFamilyMap[fontFamily] || fontFamilyMap.system)
+    root.setAttribute('data-font-family', fontFamily)
+  }, [fontFamily, mounted])
+  
+  // Update code font family
+  useEffect(() => {
+    if (!mounted) return
+    const root = window.document.documentElement
+    
+    const codeFontFamilyMap: Record<string, string> = {
+      'geist-mono': 'var(--font-geist-mono), Geist Mono, monospace',
+      'operator-mono': 'Operator Mono, monospace',
+      'jetbrains-mono': 'JetBrains Mono, monospace',
+      'maple-mono': 'Maple Mono, monospace',
+      mono: 'ui-monospace, monospace',
+      consolas: 'Consolas, monospace',
+      courier: 'Courier New, monospace',
+    }
+    
+    const fontValue = codeFontFamilyMap[codeFontFamily] || codeFontFamilyMap.mono
+    console.log('Setting code font family:', codeFontFamily, '→', fontValue)
+    root.style.setProperty('--code-font-family', fontValue)
+    root.setAttribute('data-code-font-family', codeFontFamily)
+    
+    // Force a reflow to ensure the change is applied
+    root.offsetHeight
+  }, [codeFontFamily, mounted])
 
   useEffect(() => {
     if (!mounted) return
@@ -166,6 +230,16 @@ export function ThemeProvider({
     localStorage.setItem(fontSizeStorageKey, size)
     setFontSizeState(size)
   }
+  
+  const setFontFamily = (family: string) => {
+    localStorage.setItem(fontFamilyStorageKey, family)
+    setFontFamilyState(family)
+  }
+  
+  const setCodeFontFamily = (family: string) => {
+    localStorage.setItem(codeFontFamilyStorageKey, family)
+    setCodeFontFamilyState(family)
+  }
 
   const value = {
     theme,
@@ -177,6 +251,10 @@ export function ThemeProvider({
     setCodeTheme,
     fontSize,
     setFontSize,
+    fontFamily,
+    setFontFamily,
+    codeFontFamily,
+    setCodeFontFamily,
   }
 
   return (
