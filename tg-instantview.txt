@@ -1,0 +1,157 @@
+~version: "2.1"
+
+# Blog post template for blog-vitaliharadkous-projects.vercel.app
+
+# Target body
+body: //article
+
+# Remove navigation elements
+@remove: //header
+@remove: //footer
+@remove: //nav[@aria-label="Breadcrumb"]
+@remove: //aside  # removes TOC sidebar
+@remove: //button[has-class("scroll-to-top")]
+
+# Title
+title: //h1
+
+# Author
+author: //a[starts-with(@href, "/authors/")]
+
+# Published date
+$time: //time[@datetime]
+@datetime(0): $time/@datetime
+published_date: $@
+
+# Cover image - convert to absolute URL
+$cover_container: //article/div[has-class("aspect-video")]
+$cover_img: $cover_container//img
+@if($cover_img) {
+  # Extract the original image path from srcset
+  @if($cover_img/@srcset) {
+    # Match url= parameter and extract the actual image path
+    @match("url=([^&]+)", 1): $cover_img/@srcset
+    @urldecode: $@
+    # Now we have something like /blog/16-nextjs-migration/hero.webp
+    @set_attr(src, "https://blog-vitaliharadkous-projects.vercel.app", $@): $cover_img
+  }
+
+  # Fallback to src if srcset didn't work
+  @if_not($cover_img/@src) {
+    @if($cover_img/@src) {
+      @match("url=([^&]+)", 1): $cover_img/@src
+      @urldecode: $@
+      @set_attr(src, "https://blog-vitaliharadkous-projects.vercel.app", $@): $cover_img
+    }
+  }
+
+  cover: $cover_img
+}
+
+# Image URL from meta tag as fallback
+@if_not(cover) {
+  $meta_image: //meta[@property="og:image"]/@content
+  @if($meta_image) {
+    @if(starts-with($meta_image, "http")) {
+      image_url: $meta_image
+    }
+  }
+}
+
+# Description
+description: //meta[@property="og:description"]/@content
+
+# Site name
+site_name: "Haradkou SDET"
+
+# Fix linked images - move images out of links
+$linked_images: //a//img
+@map($linked_images) {
+  $parent_link: $@/ancestor::a[1]
+  @after_el($parent_link): $@
+}
+@remove: //a[not(descendant::text()[normalize-space()]) and not(descendant::img)]
+
+# Process tags
+$tags_container: //div[has-class("flex-wrap")]//button[has-class("rounded-full")]
+@if($tags_container) {
+  @remove: $tags_container/svg
+  @append(<p>): $body
+  $tags_p: $@
+  @append_to($tags_p): "Topics: "
+  @map($tags_container) {
+    @append_to($tags_p): $@/text()
+    @if_not($last) {
+      @append_to($tags_p): ", "
+    }
+  }
+}
+
+# Process all images - convert Next.js image URLs to absolute URLs
+$all_images: $body//img
+@map($all_images) {
+  # Handle srcset attribute
+  @if($@/@srcset) {
+    @match("url=([^&]+)", 1): $@/@srcset
+    @urldecode: $@
+    @set_attr(src, "https://blog-vitaliharadkous-projects.vercel.app", $@): $@
+  }
+
+  # Handle src attribute if no srcset
+  @if_not($@/@src) {
+    @if($@/@src) {
+      # Check if it's a Next.js optimized image
+      @if(starts-with($@/@src, "/_next/image")) {
+        @match("url=([^&]+)", 1): $@/@src
+        @urldecode: $@
+        @set_attr(src, "https://blog-vitaliharadkous-projects.vercel.app", $@): $@
+      }
+    }
+  }
+
+  # If still no src, try data-src
+  @if_not($@/@src) {
+    @if($@/@data-src) {
+      @set_attr(src, "https://blog-vitaliharadkous-projects.vercel.app", $@/@data-src): $@
+    }
+  }
+
+  # Remove srcset attribute as we converted it to src
+  @remove: $@/@srcset
+}
+
+# Process code blocks
+$code_blocks: //pre[@data-language]
+@map($code_blocks) {
+  @set_attr(data-language, @data-language): $@
+  @remove: $@//button
+
+  $title_attr: $@/@data-rehype-pretty-code-title
+  @if($title_attr) {
+    @before(<p>): $@
+    @append_to($@): $title_attr
+  }
+}
+
+# Convert file tree to pre
+<pre>: //div[has-class("file-tree")]
+
+# Process blockquotes
+$blockquotes: //blockquote
+@map($blockquotes) {
+  <cite>: $@//cite
+}
+
+# Clean up UI elements
+@remove: //div[contains(text(), "min read")]
+@remove: //button
+@remove: //svg
+@remove: //nav
+@remove: //img
+
+# Process headings
+<header>: //h2
+<subheader>: //h3 | //h4 | //h5 | //h6
+
+# Simplify
+@simplify: $body

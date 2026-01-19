@@ -1,11 +1,11 @@
 ---
-title: 'Introducing Playwright Labs: Best Practices as Code'
-description: 'Discover Playwright Labs, a monorepo of curated skills and best practices for Playwright testing. Learn how to install and use the playwright-best-practices package to level up your testing game with AI-powered guidance.'
+title: "Introducing Playwright Labs: Best Practices as Code"
+description: "Discover Playwright Labs, a monorepo of curated skills and best practices for Playwright testing. Learn how to install and use the playwright-best-practices package to level up your testing game with AI-powered guidance."
 date: 2026-01-18
-image: '/blog/17-playwright-labs/hero.webp'
-authors: ['vitalics']
-tags: ['playwright', 'testing', 'typescript', 'best-practices', 'automation']
-telegram_channel: 'haradkou_sdet'
+image: "/blog/17-playwright-labs/webp_hero.webp"
+authors: ["vitalics"]
+tags: ["playwright", "testing", "typescript", "best-practices", "automation"]
+telegram_channel: "haradkou_sdet"
 ---
 
 # What is Playwright Labs?
@@ -29,27 +29,35 @@ Testing best practices are often scattered across documentation, blog posts, and
 This package contains **8 categories** of Playwright best practices, each with multiple rules and examples:
 
 ### 1. Test Stability & Reliability (CRITICAL)
+
 Focus on eliminating flaky tests and ensuring consistent results.
 
 ### 2. Test Execution Speed (CRITICAL)
+
 Optimize test performance for faster feedback loops.
 
 ### 3. Locator Best Practices (HIGH)
+
 Master element selection strategies for robust tests.
 
 ### 4. Assertions & Waiting (HIGH)
+
 Learn proper synchronization and validation techniques.
 
 ### 5. Parallel Execution (MEDIUM-HIGH)
+
 Harness the power of parallel test execution.
 
 ### 6. Fixtures & Test Organization (MEDIUM)
+
 Structure tests for maintainability and reusability.
 
 ### 7. Debugging & Maintenance (MEDIUM)
+
 Streamline troubleshooting and test maintenance.
 
 ### 8. Advanced Patterns (LOW)
+
 Explore advanced techniques for complex scenarios.
 
 ## Installation
@@ -69,11 +77,26 @@ This command integrates the best practices directly into your development enviro
   <FileTreeFolder name="packages" defaultOpen>
     <FileTreeFolder name="playwright-best-practices" defaultOpen>
       <FileTreeFolder name="rules" defaultOpen>
-        <FileTreeFile name="stable-use-waitfor.md" comment="CRITICAL: Wait for elements" />
-        <FileTreeFile name="stable-avoid-timeouts.md" comment="Avoid hardcoded timeouts" />
-        <FileTreeFile name="speed-parallel-tests.md" comment="Enable parallel execution" />
-        <FileTreeFile name="locator-use-role.md" comment="Prefer role-based selectors" />
-        <FileTreeFile name="assertion-use-expect.md" comment="Use proper assertions" />
+        <FileTreeFile
+          name="stable-use-waitfor.md"
+          comment="CRITICAL: Wait for elements"
+        />
+        <FileTreeFile
+          name="stable-avoid-timeouts.md"
+          comment="Avoid hardcoded timeouts"
+        />
+        <FileTreeFile
+          name="speed-parallel-tests.md"
+          comment="Enable parallel execution"
+        />
+        <FileTreeFile
+          name="locator-use-role.md"
+          comment="Prefer role-based selectors"
+        />
+        <FileTreeFile
+          name="assertion-use-expect.md"
+          comment="Use proper assertions"
+        />
         <FileTreeFile name="..." comment="More rules..." />
       </FileTreeFolder>
       <FileTreeFolder name="src">
@@ -142,11 +165,11 @@ Playwright automatically waits for elements to be ready. Don't fight it:
 
 ```typescript title="auto-waiting.ts" showLineNumbers
 // ❌ Manual waiting
-await page.waitForSelector('button')
-await page.click('button')
+await page.waitForSelector("button");
+await page.click("button");
 
 // ✅ Auto-waiting (preferred)
-await page.click('button') // Automatically waits for button to be actionable
+await page.click("button"); // Automatically waits for button to be actionable
 ```
 
 ### 2. Prefer Role-Based Selectors
@@ -155,10 +178,10 @@ Use accessible locators for robust tests:
 
 ```typescript title="role-selectors.ts" showLineNumbers
 // ❌ Fragile CSS selectors
-await page.click('.btn-primary')
+await page.click(".btn-primary");
 
 // ✅ Semantic role selectors
-await page.getByRole('button', { name: 'Submit' }).click()
+await page.getByRole("button", { name: "Submit" }).click();
 ```
 
 ### 3. Use Test Fixtures
@@ -169,19 +192,19 @@ Organize common setup with fixtures:
 // Define fixture
 export const test = base.extend<{ authenticatedPage: Page }>({
   authenticatedPage: async ({ page }, use) => {
-    await page.goto('/login')
-    await page.fill('[name="username"]', 'testuser')
-    await page.fill('[name="password"]', 'password')
-    await page.click('button[type="submit"]')
-    await use(page)
+    await page.goto("/login");
+    await page.fill('[name="username"]', "testuser");
+    await page.fill('[name="password"]', "password");
+    await page.click('button[type="submit"]');
+    await use(page);
   },
-})
+});
 
 // Use in tests
-test('user dashboard', async ({ authenticatedPage }) => {
-  await authenticatedPage.goto('/dashboard')
-  await expect(authenticatedPage.getByText('Welcome')).toBeVisible()
-})
+test("user dashboard", async ({ authenticatedPage }) => {
+  await authenticatedPage.goto("/dashboard");
+  await expect(authenticatedPage.getByText("Welcome")).toBeVisible();
+});
 ```
 
 ### 4. Enable Parallel Execution
@@ -192,13 +215,13 @@ Maximize test speed with parallelization:
 export default defineConfig({
   // Run tests in parallel across 4 workers
   workers: process.env.CI ? 2 : 4,
-  
+
   // Fully parallel execution mode
   fullyParallel: true,
-  
+
   // Retry failed tests
   retries: process.env.CI ? 2 : 0,
-})
+});
 ```
 
 ### 5. Use Proper Assertions
@@ -207,11 +230,11 @@ Playwright provides auto-retrying assertions:
 
 ```typescript title="assertions.ts" showLineNumbers
 // ❌ Manual checks (no retry)
-const text = await page.locator('.status').textContent()
-expect(text).toBe('Success')
+const text = await page.locator(".status").textContent();
+expect(text).toBe("Success");
 
 // ✅ Auto-retrying assertions
-await expect(page.locator('.status')).toHaveText('Success')
+await expect(page.locator(".status")).toHaveText("Success");
 ```
 
 ## Development Workflow
@@ -237,6 +260,7 @@ pnpm extract-tests
 ### Adding a New Rule
 
 1. **Copy the template**:
+
    ```bash
    cp rules/_template.md rules/stable-my-new-rule.md
    ```
@@ -244,6 +268,7 @@ pnpm extract-tests
 2. **Fill in the content** with title, impact, examples
 
 3. **Build the package**:
+
    ```bash
    pnpm build
    ```
@@ -254,6 +279,7 @@ pnpm extract-tests
    ```
 
 The build system automatically:
+
 - Generates sequential IDs
 - Sorts rules alphabetically
 - Compiles everything into `AGENTS.md`
@@ -263,13 +289,13 @@ The build system automatically:
 
 Rules are categorized by their impact on test quality:
 
-| Impact Level | Description | Focus Area |
-|-------------|-------------|------------|
-| **CRITICAL** | Major improvements to stability or speed | Must implement |
-| **HIGH** | Significant quality improvements | High priority |
-| **MEDIUM-HIGH** | Notable benefits with some effort | Recommended |
-| **MEDIUM** | Incremental improvements | Nice to have |
-| **LOW** | Advanced patterns for specific cases | Optional |
+| Impact Level    | Description                              | Focus Area     |
+| --------------- | ---------------------------------------- | -------------- |
+| **CRITICAL**    | Major improvements to stability or speed | Must implement |
+| **HIGH**        | Significant quality improvements         | High priority  |
+| **MEDIUM-HIGH** | Notable benefits with some effort        | Recommended    |
+| **MEDIUM**      | Incremental improvements                 | Nice to have   |
+| **LOW**         | Advanced patterns for specific cases     | Optional       |
 
 This prioritization helps teams focus on high-value practices first.
 
@@ -284,6 +310,7 @@ The package is optimized for LLM consumption through:
 5. **Clear Examples** - Before/after code comparisons
 
 AI coding assistants can:
+
 - Suggest best practices contextually
 - Detect anti-patterns in your code
 - Provide refactoring suggestions
