@@ -1,0 +1,228 @@
+---
+title: "The Cost of Abstractions: Optimizing Node.js Performance and Memory"
+description: "A deep dive into solving memory leaks in Node.js load testing scripts, exploring bytecode analysis, closure optimization, and the trade-offs between developer experience and performance."
+date: 2026-01-19
+image: "/blog/18-nodejs-complexity/hero.webp"
+authors: ["vitalics"]
+tags:
+  [
+    "nodejs",
+    "performance",
+    "optimization",
+    "memory",
+    "k6",
+    "websocket",
+    "typescript",
+    "javascript",
+  ]
+telegram_channel: "haradkou_sdet"
+---
+
+This week, I spent intensive time solving a critical memory leak issue in a Node.js load testing script. What started as a performance investigation turned into a deep exploration of Node.js internals, bytecode compilation, and the hidden costs of abstraction layers. Here's the complete journey from problem to solution.
+
+## The Context: K6 Load Testing with WebSocket Complexity
+
+We have a load testing script built with K6 that needs to test functionality involving both HTTP requests and WebSocket connections. The challenge is that K6's WebSocket support is quite limited and doesn't cover our specific use case.
+
+Our testing flow works like this:
+
+1. **K6 sends HTTP requests** to create trades for users, which opens one or more positions with "open" status in the system
+2. **Node.js script listens via WebSocket** to track these open positions. The complexity here is that a single request can open multiple positions, so we need to track and manage all of them
+3. **Node.js script closes positions** that exceed a certain threshold (we chose 5 open positions as the limit, since real scenarios typically have no more than 7 positions per trade)
+
+## The Problems We Faced
+
+This approach revealed several critical issues:
+
+### 1. Always-On WebSocket Connections
+
+The WebSocket must be connected at all times for all users because open positions are created for every user in the environment. This creates a massive overhead for managing thousands of concurrent connections.
+
+### 2. Big Data, Big Load
+
+With 10,000+ users, we faced enormous load on both the infrastructure and the Node.js script itself. While we tried to meter the load on the script, GitLab CI only guarantees 2GB of RAM. The CI runner can request more memory, but there's no guarantee it will be allocated.
+
+### 3. Out of Memory Crashes
+
+When GitLab CI allocated insufficient memory, the Node.js script would crash with OOM (Out of Memory) errors, causing test failures and unreliable results.
+
+### 4. Abstraction Tax
+
+Using third-party libraries for WebSocket connections and HTTP requests provided code readability and developer convenience, but came at a significant performance cost that we couldn't afford at scale.
+
+### 5. TypeScript Overhead
+
+Running TypeScript files directly with `ts-node` added another layer of compilation and memory overhead during script execution.
+
+## The Investigation: Diving Into Node.js Bytecode
+
+After countless memory measurements, overnight test runs, and debugging sessions, we concluded that we needed to optimize the script itself. But first, we needed to understand what was actually happening under the hood.
+
+We learned that Node.js transforms JavaScript code into bytecode before execution. This bytecode consists of instructions similar to assembly language, but more readable. Two powerful debugging flags became our best friends:
+
+- **`--trace-gc`**: Provides detailed garbage collection logs for memory inspection
+- **`--print-bytecode`**: Outputs the bytecode generated from your JavaScript
+
+We generated the bytecode with this command:
+
+```bash
+node --trace-gc --print-bytecode script.js > script.bytecode.log
+```
+
+The results were shocking: **825,000 lines of bytecode** (including JS compilation overhead).
+
+## The Solution: Going Native
+
+We decided to eliminate all abstraction layers and use native solutions:
+
+| Before                                       | After                 |
+| -------------------------------------------- | --------------------- |
+| axios                                        | native fetch          |
+| signalR                                      | native WebSocket      |
+| custom logger (wrapper around debug package) | console.log           |
+| TypeScript file (.ts)                        | ES Module file (.mjs) |
+| Node.js v18 (no WebSocket support)           | Node.js v22 (latest)  |
+
+The results after optimization were dramatic:
+
+- **Bytecode reduction**: From 825,000 lines down to **35,000 lines** (96% reduction)
+- **Memory allocation**: Dramatically reduced, now measured in megabytes instead of gigabytes
+- **Stability**: No more OOM crashes, even under heavy load
+
+## Deep Dive: Code Optimization Techniques
+
+Now let's explore the specific optimization techniques we applied to achieve these results.
+
+### The Original Code Structure
+
+Here's what the code looked like before optimization (pseudo-code):
+
+```js
+async function main() {
+  const data = parseCSV(ENV_START, ENV_LIMIT); // 1
+  data.forEach((row) => {
+    // 2
+    const socket = new WS(token);
+    const dispose = socket.connect("OpenPositions", accountId);
+    socket.on("message", () => {
+      /** logic */
+    }); // 3
+    disposeMap.set(row, dispose); // 4
+  });
+}
+
+process.on("SIGTERM", () => {
+  // 5
+  disposeMap.forEach(() => dispose());
+});
+
+main();
+```
+
+Breaking down this code:
+
+1. The `main` function starts by parsing CSV data to get an array of users with `token` and `accountId` fields
+2. For each user, we establish a separate WebSocket connection (we can't connect to multiple users simultaneously)
+3. When a message is received, we execute specific logic
+4. We store all connections in a map for future use
+5. On `SIGTERM` signal, we gracefully disconnect all sockets
+
+### The Hidden Cost of Abstractions
+
+The WebSocket implementation was particularly problematic. It was a wrapper around the SignalR library, which itself was enhanced with additional layers:
+
+- Independent EventEmitter
+- Custom Logger
+- Finalizer logic
+
+SignalR is notoriously finicky with limited online documentation. Additionally, it's written in TypeScript, meaning it generates substantial extra code during compilation. When you load and compile all this code into JavaScript and then into bytecode, you end up with those 835,000 lines.
+
+### Optimization Step 1: Native JavaScript and Node.js Upgrade
+
+After rewriting everything in native JavaScript and upgrading from Node.js 18 to 22, we immediately saw a reduction to **60,000 lines** of bytecode. But we weren't done yet.
+
+### Optimization Step 2: Eliminating Nested Closures
+
+We discovered that closures significantly confuse the compiler, forcing it to generate extra code to correctly capture the execution context. With multiple nested loops, even the compiler gets confused.
+
+The critical optimization was extracting the message handler function from the closure. Here's the transformation:
+
+**Before (closure inside loop):**
+
+```js
+async function main() {
+  data.forEach((line) => {
+    const ws = new WebSocket(/** params */);
+    ws.onMessage = function (event) {
+      /** implementation with access to line */
+    };
+  });
+}
+```
+
+**After (extracted function with currying):**
+
+```js
+const onMessage = (line) => (event) => {
+  /** implementation using line parameter */
+};
+
+async function main() {
+  data.forEach((line) => {
+    const ws = new WebSocket(/** params */);
+    ws.onMessage = onMessage(line);
+  });
+}
+```
+
+This seemingly simple change made a huge difference. In the second version, we pass the closure parameter to a function defined at the script's top level. This means the message handler function for each user can be reused from the highest scope, rather than creating a new closure for every iteration.
+
+The compiler can now generate much more efficient bytecode because the function reference is stable and the context is explicitly passed as a parameter, rather than implicitly captured.
+
+## Key Learnings and Takeaways
+
+### 1. Node.js Internals Matter
+
+Working with Node.js at a deeper level, including runtime flags, bytecode generation, and performance analysis, gave us insights that high-level abstractions obscure.
+
+### 2. Understanding Bytecode
+
+Learning to read and analyze bytecode output helped us identify exactly where the compiler was generating inefficient code. This is a superpower when optimizing critical paths.
+
+### 3. Real-Time Memory Profiling
+
+Gaining experience with real-time memory profiling tools (`--trace-gc`) allowed us to see exactly when and why memory was being allocated and collected.
+
+### 4. Function Declaration vs Expression in V8
+
+We found that in the V8 engine, `function` declarations and `function` expressions generate nearly identical bytecode. The performance difference between them is negligible.
+
+### 5. Loop Performance Parity
+
+When comparing `Array.prototype.forEach`, `for`, and `for...of` loops, we discovered that `for` and `Array.prototype.forEach` generate identical bytecode, meaning there's no performance difference between them in modern Node.js.
+
+### 6. The DX vs Performance Trade-off
+
+Native solutions are more lightweight and performant, but they sacrifice Developer Experience (DX). Third-party libraries offer convenience and readability at the cost of performance. Choosing between them should be a conscious decision based on your requirements.
+
+### 7. Future Optimization Opportunities
+
+There's still room for even more aggressive optimization using:
+
+- **Web Streams API** for efficient data processing
+- **Worker threads** for offloading CPU-intensive logic to separate threads
+
+We decided to defer these optimizations since our initial problem was already solved. Our current implementation handles 10,000 users comfortably, but in the future, we expect to scale to 50,000+ users per instance, at which point these advanced techniques will become necessary.
+
+## Conclusion
+
+What started as a memory leak investigation turned into a comprehensive performance optimization journey. By eliminating abstraction layers, upgrading to modern Node.js features, and understanding how the V8 compiler generates bytecode, we achieved:
+
+- **96% reduction in bytecode size** (825K → 35K lines)
+- **Massive memory savings** (gigabytes → megabytes)
+- **100% stability** (no more OOM crashes)
+- **Deep understanding** of Node.js internals and optimization techniques
+
+The lesson is clear: abstractions have costs, and when performance matters, understanding what happens beneath those abstractions is crucial. Sometimes the best optimization is to remove layers rather than add them.
+
+For teams working with high-scale Node.js applications, especially in resource-constrained environments like CI/CD pipelines, these techniques can mean the difference between a failing test suite and a reliable one.
