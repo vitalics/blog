@@ -10,6 +10,7 @@ import { ThemeScript } from '@/components/theme-script'
 import { CommandMenu } from '@/components/command-menu'
 import { ViewTransitions } from '@/components/view-transitions'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ScrollToTop } from '@/components/scroll-to-top'
 
 const geistSans = Geist({
@@ -72,6 +73,7 @@ export default function RootLayout({
           <ScrollToTop />
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
