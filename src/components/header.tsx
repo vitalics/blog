@@ -37,6 +37,11 @@ const CodeFontFamilySelector = dynamic(() => import('@/components/code-font-fami
   loading: () => <div className="h-9 w-9" />,
 })
 
+const SettingsDropdown = dynamic(() => import('@/components/settings-dropdown').then(mod => ({ default: mod.SettingsDropdown })), {
+  ssr: false,
+  loading: () => <div className="h-9 w-9" />,
+})
+
 export function Header() {
   const handleSearchClick = () => {
     const event = new KeyboardEvent('keydown', {
@@ -91,12 +96,20 @@ export function Header() {
               <span className="text-xs">⌘</span>K
             </kbd>
           </button>
-          <FontSizeSelector />
-          <FontFamilySelector />
-          <CodeFontFamilySelector />
-          <CodeThemeSelector />
-          <ThemeSelector />
-          <ThemeToggle />
+          
+          {/* Desktop: Show individual selectors */}
+          <div className="hidden lg:flex lg:items-center lg:gap-2">
+            <FontSizeSelector />
+            <FontFamilySelector />
+            <CodeFontFamilySelector />
+            <CodeThemeSelector />
+            <ThemeSelector />
+            <ThemeToggle />
+          </div>
+          
+          {/* Mobile: Show settings dropdown */}
+          <SettingsDropdown />
+          
           <MobileMenu />
         </div>
       </div>
