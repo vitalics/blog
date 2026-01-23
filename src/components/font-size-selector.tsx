@@ -3,15 +3,7 @@
 import { Type, Check } from 'lucide-react'
 import { useTheme } from './theme-provider'
 import { useState } from 'react'
-
-const FONT_SIZES = [
-  { value: 'small', label: 'Small', size: '14px' },
-  { value: 'medium', label: 'Medium', size: '16px' },
-  { value: 'large', label: 'Large', size: '18px' },
-  { value: 'x-large', label: 'Extra Large', size: '20px' },
-] as const
-
-export type FontSize = typeof FONT_SIZES[number]['value']
+import { FONT_SIZES } from '@/config/font-sizes'
 
 export function FontSizeSelector() {
   const { fontSize, setFontSize } = useTheme()
