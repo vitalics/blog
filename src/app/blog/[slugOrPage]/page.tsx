@@ -31,6 +31,7 @@ import {
   type BreadcrumbItem,
 } from '@/lib/structured-data'
 import FileTree, { FileTreeFolder, FileTreeFile } from '@/components/file-tree'
+import { Giscus } from '@/components/giscus'
 
 // YouTube embed component
 function YouTube({ id }: { id: string }) {
@@ -317,6 +318,21 @@ export default async function BlogSlugOrPagePage({
         </MDXWrapper>
 
         <PostNavigation prev={previousPost} next={nextPost} />
+
+        <div className="mt-12">
+          <Giscus
+            repo="vitalics/blog"
+            repoId="R_kgDOKPeNuw"
+            category="Q&A"
+            categoryId="DIC_kwDOKPeNu84C1UX0"
+            mapping="pathname"
+            strict="0"
+            reactionsEnabled="1"
+            emitMetadata="0"
+            inputPosition="bottom"
+            lang="en"
+          />
+        </div>
       </article>
       <aside className="hidden xl:block">
         <TableOfContents items={toc} />
