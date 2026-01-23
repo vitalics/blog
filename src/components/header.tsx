@@ -1,51 +1,98 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import dynamic from 'next/dynamic'
-import { Search } from 'lucide-react'
-import { NAV_LINKS, SITE } from '@/config/site'
-import MobileMenu from '@/components/ui/mobile-menu'
-import { PrefetchLink } from '@/components/prefetch-link'
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { Search } from "lucide-react";
+import { NAV_LINKS, SITE } from "@/config/site";
+import MobileMenu from "@/components/ui/mobile-menu";
+import { PrefetchLink } from "@/components/prefetch-link";
 
-const ThemeToggle = dynamic(() => import('@/components/theme-toggle').then(mod => ({ default: mod.ThemeToggle })), {
-  ssr: false,
-  loading: () => <div className="h-9 w-9" />,
-})
+const ThemeToggle = dynamic(
+  () =>
+    import("@/components/theme-toggle").then((mod) => ({
+      default: mod.ThemeToggle,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
 
-const ThemeSelector = dynamic(() => import('@/components/theme-selector').then(mod => ({ default: mod.ThemeSelector })), {
-  ssr: false,
-  loading: () => <div className="h-9 w-9" />,
-})
+const ThemeSelector = dynamic(
+  () =>
+    import("@/components/theme-selector").then((mod) => ({
+      default: mod.ThemeSelector,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
 
-const CodeThemeSelector = dynamic(() => import('@/components/code-theme-selector').then(mod => ({ default: mod.CodeThemeSelector })), {
-  ssr: false,
-  loading: () => <div className="h-9 w-9" />,
-})
+const CodeThemeSelector = dynamic(
+  () =>
+    import("@/components/code-theme-selector").then((mod) => ({
+      default: mod.CodeThemeSelector,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
 
-const FontSizeSelector = dynamic(() => import('@/components/font-size-selector').then(mod => ({ default: mod.FontSizeSelector })), {
-  ssr: false,
-  loading: () => <div className="h-9 w-9" />,
-})
+const FontSizeSelector = dynamic(
+  () =>
+    import("@/components/font-size-selector").then((mod) => ({
+      default: mod.FontSizeSelector,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
 
-const FontFamilySelector = dynamic(() => import('@/components/font-family-selector').then(mod => ({ default: mod.FontFamilySelector })), {
-  ssr: false,
-  loading: () => <div className="h-9 w-9" />,
-})
+const FontFamilySelector = dynamic(
+  () =>
+    import("@/components/font-family-selector").then((mod) => ({
+      default: mod.FontFamilySelector,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
 
-const CodeFontFamilySelector = dynamic(() => import('@/components/code-font-family-selector').then(mod => ({ default: mod.CodeFontFamilySelector })), {
-  ssr: false,
-  loading: () => <div className="h-9 w-9" />,
-})
+const CodeFontFamilySelector = dynamic(
+  () =>
+    import("@/components/code-font-family-selector").then((mod) => ({
+      default: mod.CodeFontFamilySelector,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
+
+const SettingsDropdown = dynamic(
+  () =>
+    import("@/components/settings-dropdown").then((mod) => ({
+      default: mod.SettingsDropdown,
+    })),
+  {
+    ssr: false,
+    loading: () => <div className="h-9 w-9" />,
+  },
+);
 
 export function Header() {
   const handleSearchClick = () => {
-    const event = new KeyboardEvent('keydown', {
-      key: 'k',
+    const event = new KeyboardEvent("keydown", {
+      key: "k",
       metaKey: true,
       bubbles: true,
-    })
-    document.dispatchEvent(event)
-  }
+    });
+    document.dispatchEvent(event);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -91,15 +138,23 @@ export function Header() {
               <span className="text-xs">⌘</span>K
             </kbd>
           </button>
-          <FontSizeSelector />
-          <FontFamilySelector />
-          <CodeFontFamilySelector />
-          <CodeThemeSelector />
-          <ThemeSelector />
-          <ThemeToggle />
+
+          {/* Desktop: Show individual selectors */}
+          <div className="hidden lg:flex lg:items-center lg:gap-2">
+            <FontSizeSelector />
+            <FontFamilySelector />
+            <CodeFontFamilySelector />
+            <CodeThemeSelector />
+            <ThemeSelector />
+            <ThemeToggle />
+          </div>
+
+          {/* Mobile: Show settings dropdown */}
+          <SettingsDropdown />
+
           <MobileMenu />
         </div>
       </div>
     </header>
-  )
+  );
 }
