@@ -2,7 +2,7 @@
 
 import { useTheme } from '@/components/theme-provider'
 import { getGiscusTheme } from '@/config/giscus-themes'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface GiscusProps {
   repo: string
@@ -31,9 +31,29 @@ export function Giscus({
 }: GiscusProps) {
   const { resolvedTheme, themeName } = useTheme()
   const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
 
+  // Use IntersectionObserver to lazy-load Giscus when it comes into view
   useEffect(() => {
     if (!ref.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '100px' } // Start loading slightly before it's visible
+    )
+
+    observer.observe(ref.current)
+
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!ref.current || !isVisible) return
 
     // Remove any existing giscus iframe to force reload
     const existingIframe = ref.current.querySelector('iframe.giscus-frame')
@@ -67,7 +87,7 @@ export function Giscus({
         ref.current.innerHTML = ''
       }
     }
-  }, [repo, repoId, category, categoryId, mapping, strict, reactionsEnabled, emitMetadata, inputPosition, lang, resolvedTheme, themeName])
+  }, [repo, repoId, category, categoryId, mapping, strict, reactionsEnabled, emitMetadata, inputPosition, lang, resolvedTheme, themeName, isVisible])
 
-  return <div ref={ref} className="giscus" />
+  return <div ref={ref} className="giscus min-h-[200px]" />
 }

@@ -11,7 +11,7 @@ import {
 import { NAV_LINKS } from '@/config/site'
 import { Menu } from 'lucide-react'
 
-const MobileMenu = () => {
+const NavMenu = () => {
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -35,7 +35,6 @@ const MobileMenu = () => {
         <Button
           variant="outline"
           size="icon"
-          className="md:hidden"
           title="Menu"
         >
           <Menu className="h-5 w-5" />
@@ -59,4 +58,4 @@ const MobileMenu = () => {
   )
 }
 
-export default MobileMenu
+export default NavMenu
