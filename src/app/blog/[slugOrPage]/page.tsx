@@ -10,7 +10,6 @@ import { BlogCardWithImage } from '@/components/blog-card-with-image'
 import { TagWithIcon } from '@/components/tag-with-icon'
 import Link from 'next/link'
 import Image from 'next/image'
-import { cookies } from 'next/headers'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeSlug from 'rehype-slug'
@@ -71,8 +70,7 @@ const components = {
   Vimeo,
 }
 
-// Make this page dynamic to read code theme from cookies
-export const dynamic = 'force-dynamic'
+// Use default code theme for static generation, client-side will apply user preference
 
 export async function generateStaticParams() {
   const posts = getBlogPosts()
@@ -190,11 +188,8 @@ export default async function BlogSlugOrPagePage({
   const toc = await extractTableOfContents(post.content)
   const { previousPost, nextPost } = getAdjacentPosts(slugOrPage)
 
-  // Get code theme from cookies
-  const cookieStore = await cookies()
-  const codeThemeCookie = cookieStore.get('blog-code-theme')
-  const selectedCodeTheme = codeThemeCookie?.value || 'github'
-  const codeTheme = getCodeTheme(selectedCodeTheme)
+  // Use default code theme for static generation - client JS will handle user preferences
+  const codeTheme = getCodeTheme('github')
 
   // Generate breadcrumbs
   const breadcrumbs: BreadcrumbItem[] = [

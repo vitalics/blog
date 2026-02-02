@@ -202,12 +202,8 @@ export function ThemeProvider({
     }
     
     const fontValue = codeFontFamilyMap[codeFontFamily] || codeFontFamilyMap.mono
-    console.log('Setting code font family:', codeFontFamily, '→', fontValue)
     root.style.setProperty('--code-font-family', fontValue)
     root.setAttribute('data-code-font-family', codeFontFamily)
-    
-    // Force a reflow to ensure the change is applied
-    root.offsetHeight
   }, [codeFontFamily, mounted])
 
   useEffect(() => {

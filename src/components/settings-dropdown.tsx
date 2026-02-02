@@ -403,7 +403,7 @@ export function SettingsDropdown() {
   );
 
   return (
-    <div className="relative lg:hidden">
+    <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="rounded-md p-2 hover:bg-accent"

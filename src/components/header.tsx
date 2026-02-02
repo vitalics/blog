@@ -3,76 +3,13 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
-import { NAV_LINKS, SITE } from "@/config/site";
-import MobileMenu from "@/components/ui/mobile-menu";
-import { PrefetchLink } from "@/components/prefetch-link";
+import { SITE } from "@/config/site";
+import { useState, useEffect } from "react";
 
-const ThemeToggle = dynamic(
-  () =>
-    import("@/components/theme-toggle").then((mod) => ({
-      default: mod.ThemeToggle,
-    })),
-  {
-    ssr: false,
-    loading: () => <div className="h-9 w-9" />,
-  },
-);
+// Placeholder component for deferred loading
+const DeferredPlaceholder = () => <div className="h-9 w-9" />;
 
-const ThemeSelector = dynamic(
-  () =>
-    import("@/components/theme-selector").then((mod) => ({
-      default: mod.ThemeSelector,
-    })),
-  {
-    ssr: false,
-    loading: () => <div className="h-9 w-9" />,
-  },
-);
-
-const CodeThemeSelector = dynamic(
-  () =>
-    import("@/components/code-theme-selector").then((mod) => ({
-      default: mod.CodeThemeSelector,
-    })),
-  {
-    ssr: false,
-    loading: () => <div className="h-9 w-9" />,
-  },
-);
-
-const FontSizeSelector = dynamic(
-  () =>
-    import("@/components/font-size-selector").then((mod) => ({
-      default: mod.FontSizeSelector,
-    })),
-  {
-    ssr: false,
-    loading: () => <div className="h-9 w-9" />,
-  },
-);
-
-const FontFamilySelector = dynamic(
-  () =>
-    import("@/components/font-family-selector").then((mod) => ({
-      default: mod.FontFamilySelector,
-    })),
-  {
-    ssr: false,
-    loading: () => <div className="h-9 w-9" />,
-  },
-);
-
-const CodeFontFamilySelector = dynamic(
-  () =>
-    import("@/components/code-font-family-selector").then((mod) => ({
-      default: mod.CodeFontFamilySelector,
-    })),
-  {
-    ssr: false,
-    loading: () => <div className="h-9 w-9" />,
-  },
-);
-
+// Dynamically load components to improve FCP
 const SettingsDropdown = dynamic(
   () =>
     import("@/components/settings-dropdown").then((mod) => ({
@@ -80,11 +17,31 @@ const SettingsDropdown = dynamic(
     })),
   {
     ssr: false,
-    loading: () => <div className="h-9 w-9" />,
+    loading: () => <DeferredPlaceholder />,
   },
 );
 
+const NavMenu = dynamic(() => import("@/components/ui/nav-menu"), {
+  ssr: false,
+  loading: () => <DeferredPlaceholder />,
+});
+
 export function Header() {
+  // Defer rendering of non-critical components until after initial paint
+  const [showDeferred, setShowDeferred] = useState(false);
+
+  useEffect(() => {
+    // Use requestIdleCallback if available, otherwise setTimeout
+    const scheduleDeferred =
+      window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 1));
+    const id = scheduleDeferred(() => setShowDeferred(true));
+    return () => {
+      if (window.cancelIdleCallback) {
+        window.cancelIdleCallback(id as number);
+      }
+    };
+  }, []);
+
   const handleSearchClick = () => {
     const event = new KeyboardEvent("keydown", {
       key: "k",
@@ -114,18 +71,6 @@ export function Header() {
           </Link>
         </div>
 
-        <nav className="hidden items-center gap-6 md:flex">
-          {NAV_LINKS.map((link) => (
-            <PrefetchLink
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium capitalize transition-colors hover:text-foreground/80"
-            >
-              {link.label}
-            </PrefetchLink>
-          ))}
-        </nav>
-
         <div className="flex items-center gap-2">
           <button
             onClick={handleSearchClick}
@@ -139,20 +84,11 @@ export function Header() {
             </kbd>
           </button>
 
-          {/* Desktop: Show individual selectors */}
-          <div className="hidden lg:flex lg:items-center lg:gap-2">
-            <FontSizeSelector />
-            <FontFamilySelector />
-            <CodeFontFamilySelector />
-            <CodeThemeSelector />
-            <ThemeSelector />
-            <ThemeToggle />
-          </div>
+          {/* Settings dropdown - unified across all screen sizes */}
+          {showDeferred ? <SettingsDropdown /> : <DeferredPlaceholder />}
 
-          {/* Mobile: Show settings dropdown */}
-          <SettingsDropdown />
-
-          <MobileMenu />
+          {/* Navigation menu - unified across all screen sizes */}
+          {showDeferred ? <NavMenu /> : <DeferredPlaceholder />}
         </div>
       </div>
     </header>
