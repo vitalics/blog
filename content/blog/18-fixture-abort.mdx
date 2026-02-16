@@ -1,0 +1,180 @@
+---
+title: "Playwright Labs: fixture abort"
+description: "If you write Playwright tests that make HTTP requests, call APIs, or perform any long-running async work, you probably have a resource leak problem you do not know about."
+date: 2026-01-18
+image: "/blog/18-fixture-abort/hero.webp"
+authors: ["vitalics"]
+tags:
+  [
+    "playwright",
+    "testing",
+    "typescript",
+    "automation",
+    "test-automation",
+    "playwright-labs",
+    "abort",
+    "fixture",
+  ]
+telegram_channel: "haradkou_sdet"
+---
+
+# The Day My Tests Brought Down the Staging Server
+
+It was a Thursday. I remember because Thursdays are when we do the big regression run.
+
+The Slack message came from our DevOps lead at 2:47 PM: "Staging is down. Again. Anyone deploying right now?"
+
+Nobody was deploying. Nobody had been deploying for hours. But staging was barely responsive -- API endpoints timing out, database connections maxed, the monitoring dashboard a wall of red.
+
+It took us two hours to figure out what was happening. The culprit was not a bad deploy, not a memory leak in a service, not a database migration gone wrong.
+
+It was our test suite.
+
+## The Investigation
+
+The first clue came from the connection pool metrics. Our main API service has a pool of 50 database connections. During the incident, all 50 were in use -- and the queue of waiting requests was growing. But the application logs showed no unusual traffic from real users.
+
+The second clue: the timing. The connection pool started filling up at exactly the same time our CI pipeline kicked off the Playwright regression suite.
+
+The third clue, and the one that made everything click: the requests holding those connections were all the same shape. Same endpoints. Same payloads. Test data patterns. They were coming from our tests.
+
+But not from tests that were currently running. They were from tests that had already timed out and been reported as failures minutes earlier.
+
+## The Zombie Request Problem
+
+Here is what was happening.
+
+We had about 40 API-level tests that called various endpoints on our staging services. Some of these endpoints were slow -- they triggered background jobs, called downstream services, ran complex queries. We had timeouts on the tests, of course. Thirty seconds for most of them.
+
+When a test timed out, Playwright did exactly what it should do: marked it as failed, killed the test function, moved on. But the HTTP requests those tests had initiated were still running. The `fetch` calls were still in flight. The server was still processing them.
+
+Each orphaned request held a database connection, occupied a server thread, and consumed memory. With 8 parallel workers running tests, and 10-15 tests timing out per run, we had 30 to 50 zombie requests accumulating in each regression run.
+
+And we run regressions every two hours.
+
+By Thursday afternoon, the accumulation had crossed the threshold. The connection pool was saturated. Legitimate requests started queuing. Response times went through the roof, causing more test timeouts, which created more zombie requests. A classic cascade.
+
+## The Fix That Did Not Work
+
+My first attempt at a fix was obvious: add cleanup in `afterEach` hooks. Close connections. Reset state. Standard stuff.
+
+It did not work. The problem is that by the time `afterEach` runs after a timeout, you do not have a reference to the in-flight requests. The `fetch` call was created inside the test function. It exists as a promise somewhere in the event loop, but you cannot reach it from cleanup code.
+
+I tried creating a global request tracker -- a Set where every `fetch` would register itself, and `afterEach` would abort everything in the Set. It was ugly, error-prone, and required disciplined use across every test file. One missed registration and you were back to leaking.
+
+There had to be a better way.
+
+## The AbortController Revelation
+
+I had used `AbortController` before, in application code. Cancelling fetch requests when a React component unmounts, for instance. But I had never thought to apply it to tests.
+
+The idea is simple: create an `AbortController` before each test. Pass its `signal` to every async operation in the test. When the test ends -- for any reason -- call `abort()` on the controller. Every operation holding the signal cancels immediately.
+
+The beautiful thing about this pattern is that it is opt-in per operation but automatic on the cancellation side. You pass the signal when you start the operation. You do not need to track it, store it, or clean it up manually. When `abort()` is called, the operation throws an `AbortError` and releases its resources.
+
+## Building the Fixture
+
+I built this into a Playwright fixture. Each test gets a fresh `AbortController` via the `abortController` fixture and its signal via the `signal` fixture. The controller is wired into the test timeout -- when the timeout fires, the controller aborts automatically.
+
+```typescript
+import { test, expect } from "@playwright-labs/fixture-abort";
+
+test("should fetch data with cancellation", async ({ signal }) => {
+  const response = await fetch("https://staging.example.com/api/data", {
+    signal,
+  });
+  const data = await response.json();
+  expect(data).toBeDefined();
+});
+
+test("should poll for job completion", async ({ signal }) => {
+  const jobId = await startJob();
+
+  while (!signal.aborted) {
+    const res = await fetch(`/api/jobs/${jobId}`, {
+      signal,
+    });
+    const { status } = await res.json();
+    if (status === "done") return;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+});
+```
+
+That is it. Pass `signal` to each fetch call, and the zombie request problem disappears entirely.
+
+## More Fixtures for More Control
+
+The package also provides `useAbortController` for registering abort callbacks, and `useSignalWithTimeout` for operations that need their own timeout:
+
+```typescript
+import { test, expect } from "@playwright-labs/fixture-abort";
+
+test("should handle abort with cleanup", async ({
+  useAbortController,
+  signal,
+}) => {
+  const controller = useAbortController({
+    onAbort: () => console.log("Cleaning up resources"),
+    abortTest: true,
+  });
+
+  const response = await fetch("/api/long-operation", { signal });
+  const data = await response.json();
+  expect(data).toBeDefined();
+});
+
+test("should complete within 5 seconds", async ({ useSignalWithTimeout }) => {
+  const timeoutSignal = useSignalWithTimeout(5000);
+
+  const response = await fetch("/api/slow", { signal: timeoutSignal });
+  expect(response.ok).toBe(true);
+});
+```
+
+## Custom Expect Matchers
+
+The package includes expect matchers for asserting abort states:
+
+```typescript
+import { test, expect } from "@playwright-labs/fixture-abort";
+
+test("should verify abort state", async ({ signal, abortController }) => {
+  expect(signal).toBeActive();
+  expect(abortController).toHaveActiveSignal();
+
+  abortController.abort("test complete");
+
+  expect(signal).toBeAborted();
+  expect(signal).toBeAbortedWithReason("test complete");
+  expect(abortController).toHaveAbortedSignal();
+});
+```
+
+## The Results
+
+We rolled this out across our test suite on a Friday. Monday morning, I checked the staging metrics.
+
+The connection pool utilization during CI runs dropped from "frequently maxed out" to "barely noticeable." Peak usage during the full regression run went from 50/50 (saturated) to 12/50. The cascade failures stopped completely.
+
+Test run times actually improved too, though that was a secondary effect. Without zombie requests clogging the staging server, the endpoints responded faster, which meant fewer timeouts, which meant fewer retries, which meant faster overall runs. A virtuous cycle replacing the vicious one.
+
+## The Lesson
+
+The lesson is not really about `AbortController`. It is about a blind spot we all have: we think about what happens when tests pass, and we think about what happens when tests fail. We do not think enough about what happens when tests time out.
+
+A timeout is not just a failure with extra steps. It is an abrupt interruption of in-progress work. And if that in-progress work involves external resources -- network connections, database queries, file handles -- those resources do not clean themselves up just because the test runner moved on.
+
+`AbortSignal` gives you a way to make your tests responsible resource citizens. When they are done, they are really done. No stragglers. No ghosts. No Thursday afternoon incidents.
+
+## Try It
+
+The fixture is available as `@playwright-labs/fixture-abort`:
+
+```bash
+npm install @playwright-labs/fixture-abort
+```
+
+Source code and docs: [github.com/vitalics/playwright-labs](https://github.com/vitalics/playwright-labs)
+
+Your staging server will thank you. Your DevOps team will thank you more.
