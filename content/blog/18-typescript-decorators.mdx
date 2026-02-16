@@ -1,0 +1,732 @@
+---
+title: "Modern TypeScript Decorators: TC39 Stage 3 - No More Reflect-Metadata!"
+date: "2026-02-09"
+description: "Deep dive into modern TypeScript decorators with practical examples from a real Playwright testing framework. Learn about context.metadata, type inference, and why you should migrate from legacy decorators."
+tags: ["typescript", "decorators", "playwright", "testing", "tc39"]
+---
+
+# Modern TypeScript Decorators: TC39 Stage 3 - No More Reflect-Metadata!
+
+## Introduction
+
+TypeScript decorators have evolved significantly. The new TC39 Stage 3 decorators are now standardized, type-safe, and **don't require the `reflect-metadata` package**. If you're still using legacy decorators with `experimentalDecorators: true`, it's time to upgrade.
+
+In this post, I'll show you real-world examples from a Playwright testing framework that uses modern decorators for class-based test organization, demonstrating why the new syntax is superior.
+
+## Why Modern Decorators Are Better
+
+### 1. ✅ No `reflect-metadata` Dependency
+
+**Legacy decorators:**
+
+```typescript
+import "reflect-metadata"; // ❌ External dependency required
+
+function MyDecorator(target: any, propertyKey: string) {
+  Reflect.defineMetadata("custom", value, target, propertyKey);
+  const meta = Reflect.getMetadata("custom", target, propertyKey);
+}
+```
+
+**Modern decorators:**
+
+```typescript
+// ✅ No imports needed - built into the language!
+
+function MyDecorator(target: any, context: DecoratorContext) {
+  context.metadata.custom = value; // Direct access to metadata
+}
+```
+
+### 2. ✅ Better Type Inference
+
+Modern decorators have **first-class TypeScript support** with proper generic constraints:
+
+```typescript
+// ✅ Type-safe: Only works on async functions
+function log<
+  const Name extends string,
+  const T extends (this: any, ...args: any[]) => Promise<unknown> = (
+    ...args: Args
+  ) => Promise<unknown>,
+>() {
+  return function (target: T, context: DecoratorContext) {
+    if (context.kind !== "method") {
+      throw new Error("step decorator can only be used on methods");
+    }
+    // TypeScript ensures T is async!
+    return async function (...args: Args) {
+      /* ... */
+    };
+  };
+}
+
+class Example {
+  @log("my async step")
+  async myAsyncMethod() {} // ✅ Works
+
+  @log("sync step")
+  syncMethod() {} // ❌ TypeScript error: must be async!
+}
+```
+
+### 3. ✅ TC39 Stage 3 - Standardized JavaScript
+
+Modern decorators are **Stage 3** in the TC39 proposal process, meaning they're nearly finalized and will be part of JavaScript itself. Legacy decorators were never standardized.
+
+### 4. ✅ Cleaner Code with Context
+
+The `context` object provides structured access to metadata, eliminating the mess of multiple reflection APIs.
+
+---
+
+## Understanding Decorator Context
+
+Every modern decorator receives a `context` object with powerful features:
+
+```typescript
+interface DecoratorContext {
+  kind: "class" | "method" | "getter" | "setter" | "field" | "accessor";
+  name: string | symbol;
+  access?: { get?(): any; set?(value: any): void };
+  private?: boolean;
+  static?: boolean;
+  addInitializer(initializer: () => void): void;
+  metadata: Record<PropertyKey, unknown>; // 🔥 The magic!
+}
+```
+
+### The Power of `context.metadata`
+
+`context.metadata` is a **shared object** across all decorators in a class hierarchy. This enables decorators to communicate:
+
+```typescript
+// Property decorator stores parameter info
+function param(name: string) {
+  return function (target: any, context: ClassFieldDecoratorContext) {
+    context.metadata.params = context.metadata.params || {};
+    context.metadata.params[name] = {
+      name: name,
+      originalName: context.name,
+    };
+  };
+}
+
+// Method decorator reads parameter info
+function step(template: string) {
+  return function (target: any, context: ClassMethodDecoratorContext) {
+    const params = context.metadata.params; // Access shared metadata!
+    // Use params to transform template...
+  };
+}
+
+class Example {
+  @param("username")
+  user = "john_doe";
+
+  @step("Login as $username") // Uses metadata from @param!
+  async login() {}
+}
+```
+
+---
+
+## Real-World Example 1: Class Decorator
+
+Let's build a `@logInstance` decorator that sends log when the instance is created.
+
+### The Goal
+
+```typescript
+@logInstance("User")
+class User {
+  /** implementation */
+}
+
+new User(); // calls [User]. Initialized
+```
+
+### Implementation
+
+```typescript
+function logInstance(prefix?: string) {
+  return function <T extends new (...args: any[]) => any>(
+    target: T,
+    context: ClassDecoratorContext<T>,
+  ) {
+    // Access metadata populated by @test decorators
+    const metadata = context.metadata as any;
+    const describeName = prefix ?? context.name.toString();
+
+    context.addInitializer(function () {
+      console.log(`[${describeName}]. Initialized`);
+    });
+
+    // advanced: you can return Proxy
+    return new Proxy(target, {
+      construct(target, args, newTarget) {
+        const instance = Reflect.construct(target, args, newTarget);
+        console.log(`[${describeName}]. Created`);
+        return instance;
+      },
+    });
+  };
+}
+```
+
+### Key Features
+
+1. **Type safety**: `T extends new (...args: any[]) => any` ensures it's a class
+2. **No reflection package needed**: Built-in metadata support, more native way
+
+---
+
+## Real-World Example 2: Method Decorator with Type Constraints
+
+The `@logAsync` decorator adds logs only for function that returns a Promise
+
+### The Goal
+
+```typescript
+class CheckoutFlow {
+  @logAsync("Add product to cart")
+  async addToCart(productName: string) {
+    /* ... */
+  }
+
+  @logAsync("Apply discount code")
+  async applyDiscount(code: string) {
+    /* ... */
+  }
+}
+```
+
+### Implementation
+
+```typescript
+function logAsync<
+  // 🔥 Constraint: Only async functions!
+  const T extends (...args: any[]) => Promise<unknown> = (
+    ...args: any[]
+  ) => Promise<unknown>,
+>(message?: string) {
+  return function (target: T, context: ClassMethodDecoratorContext) {
+    // 🛡️ Runtime validation
+    if (context.kind !== "method") {
+      throw new Error("logAsync decorator can only be used on methods");
+    }
+
+    if (context.static) {
+      throw new Error(
+        "logAsync decorator can only be used on instance methods",
+      );
+    }
+    if (context.private) {
+      // declared with private field (e.g. #myMethod)
+      throw new Error("logAsync decorator can only be used on public methods");
+    }
+
+    // Return replacement method
+    return async function (this: any, ...args: Args): Promise<any> {
+      console.log(`Starting ${message}`);
+      const returnValue = await Reflect.apply(target, this, args);
+      console.log(`Finishing ${message}`);
+    };
+  };
+}
+```
+
+### Advanced: Named Parameters with Metadata
+
+Combine `@param` property decorator with `@step` method decorator:
+
+```typescript
+class UserActions {
+  @param("user")
+  username = "john_doe";
+
+  @step("Login as $user") // Named parameter!
+  async login() {
+    // Step displays: "Login as john_doe"
+  }
+}
+```
+
+**How it works:**
+
+```typescript
+// 1. Property decorator stores metadata
+function param(name: string) {
+  return function (target: any, context: ClassFieldDecoratorContext) {
+    context.addInitializer(function () {
+      context.metadata.params = context.metadata.params || {};
+      context.metadata.params[name] = {
+        name: name,
+        originalName: context.name,
+      };
+    });
+  };
+}
+
+// 2. Method decorator reads metadata
+function step<
+  // only async methods allows here, function should return a Promise
+  T extends (...args: any[]) => Promise<any>,
+>(template: string) {
+  return function (target: any, context: ClassMethodDecoratorContext<T>) {
+    return async function (this: any, ...args: any[]) {
+      // 🔥 Access params from context.metadata
+      const params = context.metadata?.params || {};
+
+      let transformedName = template;
+
+      // Replace named parameters like $user
+      for (const [paramName, paramInfo] of Object.entries(params)) {
+        const value = this[paramInfo.originalName];
+        transformedName = transformedName.replace(
+          new RegExp(`\\$${paramName}`, "g"),
+          String(value),
+        );
+      }
+
+      // automatically wrap the step
+      return test.step(transformedName, async () =>
+        Reflect.apply(target, this, args),
+      );
+    };
+  };
+}
+```
+
+---
+
+## Real-World Example 3: Property Decorator
+
+The `@param` decorator marks class properties as named parameters for test step templates.
+
+### The Goal
+
+```typescript
+class ApiTests {
+  @param("endpoint")
+  apiUrl = "/api/users";
+
+  @param("method")
+  httpMethod = "GET";
+
+  @step("$method request to $endpoint")
+  async makeRequest() {
+    // Step displays: "GET request to /api/users"
+  }
+}
+```
+
+### Implementation
+
+```typescript
+function param<const Name extends string, const TT, const V>(name?: Name) {
+  return function (_: any, context: ClassFieldDecoratorContext<TT, V>) {
+    const paramName = name ?? context.name.toString();
+
+    // 🛡️ Validation
+    if (context.static) {
+      throw new Error("Static properties cannot be decorated with @param");
+    }
+    if (context.private) {
+      throw new Error("Private properties cannot be decorated with @param");
+    }
+
+    // 🔥 Use addInitializer to run after property is defined
+    context.addInitializer(function () {
+      // Store parameter info in metadata
+      if (!context.metadata.params) {
+        context.metadata.params = {};
+      }
+
+      context.metadata.params[paramName] = {
+        name: paramName,
+        originalName: context.name,
+      };
+    });
+  };
+}
+```
+
+## Context Properties Deep Dive
+
+### `context.kind`
+
+Identifies the decorator target type:
+
+```typescript
+function universal(target: any, context: DecoratorContext) {
+  switch (context.kind) {
+    case "class":
+      console.log("Decorating a class");
+      break;
+    case "method":
+      console.log("Decorating a method");
+      break;
+    case "field":
+      console.log("Decorating a property");
+      break;
+    // ... other kinds
+  }
+}
+
+@universal // decorating a class
+class Universal {
+  @universal // decorating a method
+  someMethod() {}
+
+  @universal // decorating a method (private)
+  #someMethod() {}
+
+  @universal // decorating a method (static)
+  static someMethod() {}
+
+  @universal // decorating a property
+  someProperty: string;
+
+  @universal // decorating a property (private)
+  #someProperty: string;
+
+  @universal // decorating a property (static)
+  static someProperty: string;
+}
+```
+
+### `context.name`
+
+The name of the decorated element:
+
+```typescript
+function logName(target: any, context: DecoratorContext) {
+  console.log(`Decorating: ${String(context.name)}`);
+}
+
+class Example {
+  @logName
+  myMethod() {} // Logs: "Decorating: myMethod"
+}
+```
+
+**NOTE:** `context.name` can be a string or a symbol, be noticed!
+
+### `context.access`
+
+Provides getters/setters for fields:
+
+```typescript
+function logged(target: any, context: ClassFieldDecoratorContext) {
+  return function (this: any, initialValue: any) {
+    const value = initialValue;
+
+    // Use context.access for reading/writing
+    return {
+      get() {
+        console.log(`Reading: ${String(context.name)}`);
+        return context.access.get?.call(this) ?? value;
+      },
+      set(newValue: any) {
+        console.log(`Writing: ${String(context.name)} = ${newValue}`);
+        context.access.set?.call(this, newValue);
+      },
+    };
+  };
+}
+```
+
+### `context.addInitializer`
+
+Run code after the target is initialized:
+
+```typescript
+function register(target: any, context: ClassDecoratorContext) {
+  context.addInitializer(function () {
+    console.log(`Instance of ${target.name} created`);
+    // 'this' is the instance
+  });
+}
+
+@register
+class Example {}
+
+const instance = new Example(); // Logs: "Instance of Example created"
+```
+
+### `context.metadata`
+
+The shared metadata object - the most powerful feature:
+
+```typescript
+// Decorator 1: Store data
+function storeVersion(version: string) {
+  return function (target: any, context: ClassDecoratorContext) {
+    context.metadata.version = version;
+  };
+}
+
+// Decorator 2: Read data
+function logVersion(target: any, context: ClassDecoratorContext) {
+  context.addInitializer(function () {
+    console.log(`Version: ${context.metadata.version}`);
+  });
+}
+
+@storeVersion("1.0.0")
+@logVersion
+class Example {} // Logs: "Version: 1.0.0"
+```
+
+---
+
+## Inheritance and Metadata
+
+Metadata is **inherited** through the prototype chain, but you need to access it correctly:
+
+### ❌ Wrong: Using `Symbol.metadata` on non-decorated classes
+
+```typescript
+class BaseTest {
+  @param("user")
+  username = "base";
+}
+
+class ChildTest extends BaseTest {}
+
+// ❌ This doesn't work - ChildTest has no metadata
+const metadata = ChildTest[Symbol.metadata]; // undefined!
+```
+
+### ✅ Correct: Walk the prototype chain
+
+```typescript
+function describe(name: string) {
+  return function (target: any, context: ClassDecoratorContext) {
+    // Collect metadata from current class
+    const metadata = context.metadata;
+    const params = metadata?.params || {};
+
+    // Walk up prototype chain for inherited metadata
+    let currentProto = target.prototype;
+    while (currentProto && currentProto !== Object.prototype) {
+      const protoConstructor = currentProto.constructor;
+      const protoMetadata = protoConstructor[Symbol.metadata];
+
+      if (protoMetadata?.params) {
+        // Merge inherited params (child takes precedence)
+        Object.assign(params, protoMetadata.params);
+      }
+
+      currentProto = Object.getPrototypeOf(currentProto);
+    }
+  };
+}
+```
+
+---
+
+## Type Inference Magic
+
+Modern decorators enable advanced type inference:
+
+### Example 1: Infer Arguments from Template String
+
+```typescript
+type InferArgsFromTemplateString<
+  Name extends string,
+  Args extends readonly unknown[] = [],
+> = Name extends `${string}$${infer First extends number}${infer Rest}`
+  ? InferArgsFromTemplateString<Rest, [...Args, argument: unknown]>
+  : Args;
+
+// Usage:
+type Args1 = InferArgsFromTemplateString<"Add $0 to $1">;
+// Result: [unknown, unknown]
+
+type Args2 = InferArgsFromTemplateString<"No params">;
+// Result: []
+```
+
+### Example 2: Ensure Correct Argument Count
+
+```typescript
+function test<
+  const Name extends string,
+  const Args extends readonly unknown[] = InferArgsFromTemplateString<Name>,
+  const T extends (...args: Args) => any = (...args: Args) => any,
+>(name: Name) {
+  return function (target: T, context: DecoratorContext) {
+    // TypeScript ensures the function signature matches the template!
+  };
+}
+
+class Tests {
+  @test("Test with $0 and $1")
+  testMethod(a: string, b: number) {} // ✅ Correct: 2 params
+
+  @test("Test with $0 and $1")
+  wrongMethod(a: string) {} // ❌ TypeScript error: needs 2 params!
+}
+```
+
+### Example 3: Prevent Invalid Names
+
+```typescript
+type NoSpaces<T extends string> = T extends `${string} ${string}`
+  ? ["Cannot use spaces in parameter name", never]
+  : T;
+
+function param<const Name extends string>(name: NoSpaces<Name>) {
+  // ...
+}
+
+class Example {
+  @param("userName") // ✅ OK
+  user = "test";
+
+  @param("user name") // ❌ TypeScript error!
+  invalidUser = "test";
+}
+```
+
+---
+
+## Migration Guide
+
+### Legacy Decorators (experimentalDecorators)
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true, // ❌ Old way
+    "emitDecoratorMetadata": true
+  }
+}
+
+// Code
+import "reflect-metadata";
+
+function Logger(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+  descriptor.value = function(...args: any[]) {
+    console.log(`Calling ${propertyKey}`);
+    return originalMethod.apply(this, args);
+  };
+}
+
+class Example {
+  @Logger
+  myMethod() { }
+}
+```
+
+### Modern Decorators (TC39 Stage 3)
+
+```typescript
+// tsconfig.json
+{
+  "compilerOptions": {
+    // ✅ No special flags needed! Just use latest TypeScript
+  }
+}
+
+// Code - no imports needed!
+function Logger(target: any, context: ClassMethodDecoratorContext) {
+  const methodName = String(context.name);
+
+  return function(this: any, ...args: any[]) {
+    console.log(`Calling ${methodName}`);
+    return Reflect.apply(target, this, args);
+  };
+}
+
+class Example {
+  @Logger
+  myMethod() { }
+}
+```
+
+---
+
+## Best Practices
+
+### 1. Always Validate `context.kind`
+
+```typescript
+function myDecorator(target: any, context: DecoratorContext) {
+  if (context.kind !== "method") {
+    throw new Error("Only works on methods");
+  }
+  // ...
+}
+```
+
+### 2. Use `context.addInitializer` for Setup
+
+```typescript
+function setup(target: any, context: ClassDecoratorContext) {
+  context.addInitializer(function () {
+    // This runs after construction
+    console.log("Instance created:", this);
+  });
+}
+```
+
+### 3. Leverage TypeScript Constraints
+
+```typescript
+// Only allow on async methods
+function asyncOnly<T extends (...args: any[]) => Promise<any>>(
+  target: T,
+  context: DecoratorContext,
+) {
+  // TypeScript enforces T is async
+}
+```
+
+### 4. Document Metadata Contracts
+
+```typescript
+interface MyMetadata {
+  version: string;
+  tests: Array<{ name: string; methodName: string }>;
+  params: Record<string, { name: string; formatter?: (v: any) => string }>;
+}
+
+function myDecorator(target: any, context: DecoratorContext) {
+  const metadata = context.metadata as MyMetadata;
+  // Now you have type safety!
+}
+```
+
+---
+
+## Conclusion
+
+Modern TypeScript decorators (TC39 Stage 3) are a massive improvement:
+
+✅ **No `reflect-metadata` package needed**  
+✅ **Better type inference and safety**  
+✅ **Standardized JavaScript feature**  
+✅ **Cleaner code with `context` object**  
+✅ **Powerful `context.metadata` for decorator communication**
+
+The examples in this post are from a real Playwright testing framework that uses these decorators in production. The code is cleaner, more type-safe, and easier to maintain than legacy decorator implementations.
+
+If you're still using `experimentalDecorators: true`, now is the time to migrate. The future of JavaScript decorators is here, and it's better than ever.
+
+---
+
+## Resources
+
+- [TC39 Decorator Proposal](https://github.com/tc39/proposal-decorators)
+- [TypeScript 5.0 Decorators](https://devblogs.microsoft.com/typescript/announcing-typescript-5-0/#decorators)
+- [Playwright Testing Framework](https://playwright.dev)
+- [Example Code Repository](https://github.com/playwright-labs/fixture-generic)
+
+---
+
+**Want to see more?** The full implementation with `@describe`, `@test`, `@test.each`, `@beforeEach`, `@afterEach`, `@param`, and `@step` decorators is open source. Check out the repository for complete working examples!
