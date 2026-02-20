@@ -1,8 +1,11 @@
 ---
 title: "Modern TypeScript Decorators: TC39 Stage 3 - No More Reflect-Metadata!"
-date: "2026-02-09"
 description: "Deep dive into modern TypeScript decorators with practical examples from a real Playwright testing framework. Learn about context.metadata, type inference, and why you should migrate from legacy decorators."
 tags: ["typescript", "decorators", "playwright", "testing", "tc39"]
+authors: ["vitalics"]
+date: 2026-02-20
+image: "/blog/20-typescript-decorators/hero.webp"
+telegram_channel: "haradkou_sdet"
 ---
 
 # Modern TypeScript Decorators: TC39 Stage 3 - No More Reflect-Metadata!
@@ -135,7 +138,7 @@ class Example {
 
 Let's build a `@logInstance` decorator that sends log when the instance is created.
 
-### The Goal
+### Class Decorator Goal
 
 ```typescript
 @logInstance("User")
@@ -185,7 +188,7 @@ function logInstance(prefix?: string) {
 
 The `@logAsync` decorator adds logs only for function that returns a Promise
 
-### The Goal
+### Method Decorator Goal
 
 ```typescript
 class CheckoutFlow {
@@ -205,7 +208,7 @@ class CheckoutFlow {
 
 ```typescript
 function logAsync<
-  // 🔥 Constraint: Only async functions!
+  // Constraint: Only async functions!
   const T extends (...args: any[]) => Promise<unknown> = (
     ...args: any[]
   ) => Promise<unknown>,
@@ -275,7 +278,7 @@ function step<
 >(template: string) {
   return function (target: any, context: ClassMethodDecoratorContext<T>) {
     return async function (this: any, ...args: any[]) {
-      // 🔥 Access params from context.metadata
+      // Access params from context.metadata
       const params = context.metadata?.params || {};
 
       let transformedName = template;
@@ -304,7 +307,7 @@ function step<
 
 The `@param` decorator marks class properties as named parameters for test step templates.
 
-### The Goal
+### Property Decorator Goal
 
 ```typescript
 class ApiTests {
@@ -328,7 +331,7 @@ function param<const Name extends string, const TT, const V>(name?: Name) {
   return function (_: any, context: ClassFieldDecoratorContext<TT, V>) {
     const paramName = name ?? context.name.toString();
 
-    // 🛡️ Validation
+    // Validation
     if (context.static) {
       throw new Error("Static properties cannot be decorated with @param");
     }
@@ -336,7 +339,7 @@ function param<const Name extends string, const TT, const V>(name?: Name) {
       throw new Error("Private properties cannot be decorated with @param");
     }
 
-    // 🔥 Use addInitializer to run after property is defined
+    // Use addInitializer to run after property is defined
     context.addInitializer(function () {
       // Store parameter info in metadata
       if (!context.metadata.params) {

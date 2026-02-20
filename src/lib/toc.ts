@@ -13,6 +13,8 @@ export async function extractTableOfContents(markdown: string): Promise<TocItem[
 
   await remark()
     .use(() => (tree: Root) => {
+      const seen = new Map<string, number>()
+
       visit(tree, 'heading', (node) => {
         if (node.depth >= 2 && node.depth <= 3) {
           const text = node.children
@@ -21,12 +23,16 @@ export async function extractTableOfContents(markdown: string): Promise<TocItem[
             .join('')
 
           if (text) {
-            const id = text
+            const base = text
               .toLowerCase()
               .replace(/[^a-z0-9\s-]/g, '')
               .replace(/\s+/g, '-')
               .replace(/-+/g, '-')
               .trim()
+
+            const count = seen.get(base) ?? 0
+            const id = count === 0 ? base : `${base}-${count}`
+            seen.set(base, count + 1)
 
             toc.push({
               id,
