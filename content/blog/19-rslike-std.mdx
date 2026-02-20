@@ -1,0 +1,199 @@
+---
+title: "Option and Result in TypeScript: A Practical Guide to @rslike/std"
+description: "How to replace null checks and invisible thrown errors with explicit Option<T> and Result<T,E> types from @rslike/std."
+date: 2026-02-19
+image: "/blog/19-rslike-std/hero.webp"
+tags: [typescript, rust, errorhandling, open-source]
+authors: ["vitalics"]
+telegram_channel: "haradkou_sdet"
+---
+
+I want to show you two patterns that changed how I write TypeScript: `Option<T>` and `Result<T, E>`. Both come from Rust. Both are available in `@rslike/std`.
+
+## The problem with null and throw
+
+TypeScript has improved null safety, but two problems remain:
+
+**Problem 1 — nullable returns:**
+
+```ts
+function findById(id: number): User | null { ... }
+
+// TypeScript warns here with strictNullChecks, but this still compiles:
+const user = findById(42)!; // non-null assertion silences the warning
+console.log(user.name);     // runtime crash if user is null
+```
+
+**Problem 2 — invisible exceptions:**
+
+```ts
+// This function can throw network errors, JSON parse errors,
+// validation errors — none of which appear in the type.
+async function fetchConfig(): Promise<Config> { ... }
+```
+
+`Option` and `Result` solve both. They make absence and failure **part of the type signature**, not hidden in documentation.
+
+## Option: nullable done right
+
+```ts
+import { Some, None, Option, match } from "@rslike/std";
+
+function findUser(id: number): Option<User> {
+  const user = db.find((u) => u.id === id);
+  return user ? Some(user) : None();
+}
+```
+
+The return type tells callers: "this might not have a value." There's no way to accidentally treat `None` as a `User`.
+
+### Transforming without unwrapping
+
+The real power is the chain API — you transform the value inside the `Option` without ever having to check if it exists:
+
+```ts
+const displayName = findUser(42)
+  .map((u) => u.profile)
+  .flatMap((profile) => (profile ? Some(profile.displayName) : None()))
+  .map((name) => name.trim())
+  .unwrapOr("Anonymous");
+```
+
+At no point do you write an `if (user !== null)` check. The `None` propagates automatically through the chain.
+
+### Extracting values
+
+```ts
+const opt = Some({ name: "Alice", age: 30 });
+
+opt.isSome(); // true
+opt.isNone(); // false
+opt.unwrap(); // { name: "Alice", age: 30 }
+opt.unwrapOr({}); // { name: "Alice", age: 30 }
+
+const empty = None<User>();
+empty.isNone(); // true
+empty.unwrapOr(guest); // guest
+empty.unwrap(); // throws UndefinedBehaviorError
+```
+
+### Pattern matching
+
+```ts
+const greeting = match(
+  findUser(42),
+  (user) => `Welcome back, ${user.name}!`,
+  () => "Please log in.",
+);
+```
+
+## Result: explicit error handling
+
+```ts
+import { Ok, Err, Result, match } from "@rslike/std";
+
+function readConfig(path: string): Result<Config, NodeJS.ErrnoException> {
+  return new Result((ok, err) => {
+    try {
+      const raw = fs.readFileSync(path, "utf8");
+      ok(JSON.parse(raw) as Config);
+    } catch (e) {
+      err(e as NodeJS.ErrnoException);
+    }
+  });
+}
+```
+
+The error type is in the signature. Every caller knows this can fail with a `NodeJS.ErrnoException`.
+
+### Chaining results
+
+```ts
+const config = readConfig("./config.json")
+  .map((cfg) => ({ ...cfg, port: cfg.port ?? 3000 })) // transform success
+  .mapErr((e) => `Config error: ${e.code}`) // transform error
+  .unwrapOr(defaultConfig);
+```
+
+### Combining Result and Option
+
+```ts
+function getServerPort(configPath: string): number {
+  const result = readConfig(configPath);
+
+  return match(
+    result,
+    (cfg) =>
+      match(
+        cfg.port != null ? Some(cfg.port) : None(),
+        (port) => port,
+        () => 3000,
+      ),
+    (err) => {
+      console.warn(`Falling back to default port. Reason: ${err}`);
+      return 3000;
+    },
+  );
+}
+```
+
+## `match` — exhaustive dispatch
+
+`match` handles both branches of an `Option` or `Result`. TypeScript infers the parameter types for each callback from the input type:
+
+```ts
+// Option<User> → callbacks are (user: User) and ()
+match(
+  findUser(42),
+  (user) => renderProfile(user),
+  () => renderLoginForm(),
+);
+
+// Result<Config, string> → callbacks are (cfg: Config) and (err: string)
+match(
+  readConfig("./app.json"),
+  (cfg) => startServer(cfg),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);
+
+// boolean → callbacks are (true: true) and (false: false)
+match(
+  isAuthenticated,
+  () => dashboard(),
+  () => loginPage(),
+);
+```
+
+## Globals — zero-import ergonomics
+
+For convenience, one import makes `Some`, `None`, `Ok`, `Err` available globally:
+
+```ts
+// app entry point
+import "@rslike/std/globals";
+
+// any file — no imports required
+const session = Some(currentUser);
+const result = Ok(parsedData);
+```
+
+## When to use which
+
+| Situation                             | Use            |
+| ------------------------------------- | -------------- |
+| Value that might not exist            | `Option<T>`    |
+| Operation that can fail               | `Result<T, E>` |
+| Optional function argument with logic | `Option<T>`    |
+| API call, file read, parse            | `Result<T, E>` |
+| Just need a type-safe null check      | `Option<T>`    |
+
+## Install
+
+```bash
+npm i @rslike/std
+```
+
+GitHub: [github.com/vitalics/rslike](https://github.com/vitalics/rslike)
