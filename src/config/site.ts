@@ -12,6 +12,7 @@ export const NAV_LINKS = [
   { href: '/authors', label: 'Authors' },
   { href: '/projects', label: 'Projects' },
   { href: '/tags', label: 'Tags' },
+  { href: '/utils', label: 'Utils' },
 ]
 
 export const SOCIAL_LINKS = {

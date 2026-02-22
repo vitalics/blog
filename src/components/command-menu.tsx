@@ -18,6 +18,7 @@ import {
   SunMoon,
   SquareFunction,
   Users,
+  Wrench,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -323,6 +324,8 @@ export function CommandMenu() {
         return <Hash className="mr-2 h-4 w-4" />;
       case "author":
         return <User className="mr-2 h-4 w-4" />;
+      case "tool":
+        return <Wrench className="mr-2 h-4 w-4" />;
       case "settings":
         // Map icon based on settings description
         if (description?.includes("Appearance")) {
@@ -350,6 +353,7 @@ export function CommandMenu() {
   const posts = searchResults.filter((r) => r.type === "post");
   const tags = searchResults.filter((r) => r.type === "tag");
   const authors = searchResults.filter((r) => r.type === "author");
+  const tools = searchResults.filter((r) => r.type === "tool");
   const settingsResults = searchResults.filter((r) => r.type === "settings");
 
   const themes = getAllThemes();
@@ -364,7 +368,7 @@ export function CommandMenu() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
       <CommandInput
-        placeholder="Search posts, tags, authors, or settings..."
+        placeholder="Search posts, tools, tags, authors, or settings..."
         onValueChange={handleSearch}
       />
       <CommandList>
@@ -380,6 +384,35 @@ export function CommandMenu() {
               <span>Posts</span>
             </div>
             {posts.map((result) => (
+              <CommandItem
+                key={result.url}
+                onSelect={() => handleSelect(result.url)}
+                className="cursor-pointer"
+              >
+                {getIcon(result.type)}
+                <div className="flex flex-col">
+                  <span>{result.title}</span>
+                  {result.description && (
+                    <span className="text-xs text-muted-foreground">
+                      {result.description}
+                    </span>
+                  )}
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {tools.length > 0 && (
+          <CommandGroup>
+            <div
+              className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground"
+              cmdk-group-heading=""
+            >
+              <Wrench className="h-4 w-4" />
+              <span>Tools</span>
+            </div>
+            {tools.map((result) => (
               <CommandItem
                 key={result.url}
                 onSelect={() => handleSelect(result.url)}
