@@ -51,10 +51,37 @@ self.onmessage = async function (event) {
     }
 
     // GIF passthrough — Canvas cannot encode animated GIFs.
-    // Return the original bytes unchanged when the target is also GIF.
+    // If a resize is requested, decode the first frame and re-encode as PNG
+    // (GIF encoder is not available in the browser without a library).
     if (fmt === 'gif') {
-      const resultBlob = new Blob([imageData], { type: 'image/gif' })
-      self.postMessage({ result: resultBlob, format: 'gif' })
+      const sourceBlob = new Blob([imageData], { type: 'image/gif' })
+      const bitmap = await createImageBitmap(sourceBlob)
+      const srcW = bitmap.width
+      const srcH = bitmap.height
+      const destW = outputWidth ?? srcW
+      const destH = outputHeight ?? srcH
+      const needsResize = destW !== srcW || destH !== srcH
+
+      if (!needsResize) {
+        // No resize needed — return original bytes unchanged (preserves animation)
+        bitmap.close()
+        const resultBlob = new Blob([imageData], { type: 'image/gif' })
+        self.postMessage({ result: resultBlob, format: 'gif' })
+        return
+      }
+
+      // Resize requested — browser cannot re-encode animated GIF, so we
+      // render the first frame at the new size and emit as PNG instead.
+      const canvas = new OffscreenCanvas(destW, destH)
+      const ctx = canvas.getContext('2d')
+      if (bgColor) {
+        ctx.fillStyle = bgColor
+        ctx.fillRect(0, 0, destW, destH)
+      }
+      ctx.drawImage(bitmap, 0, 0, destW, destH)
+      bitmap.close()
+      const resultBlob = await canvas.convertToBlob({ type: 'image/png' })
+      self.postMessage({ result: resultBlob, format: 'png', formatOverride: true })
       return
     }
 

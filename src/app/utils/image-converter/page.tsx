@@ -132,7 +132,9 @@ export default function ImageConverterPage() {
   const [status, setStatus] = useState<ConvertStatus>('idle')
   const [resultBlob, setResultBlob] = useState<Blob | null>(null)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [resultFormat, setResultFormat] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [customName, setCustomName] = useState<string | null>(null)
 
   // --- AI enhancer ---
   const [aiEnabled, setAiEnabled] = useState(false)
@@ -233,6 +235,8 @@ export default function ImageConverterPage() {
       setAiStatus('idle')
       setErrorMsg(null)
       setAiErrorMsg(null)
+      setResultFormat(null)
+      setCustomName(null)
       setSourceFile(file)
       setTargetFormat(file.type === 'image/gif' ? 'webp' : 'webp')
 
@@ -292,6 +296,8 @@ export default function ImageConverterPage() {
     setAiStatus('idle')
     setErrorMsg(null)
     setAiErrorMsg(null)
+    setResultFormat(null)
+    setCustomName(null)
     setWidth('')
     setHeight('')
     setTargetFormat('webp')
@@ -321,6 +327,8 @@ export default function ImageConverterPage() {
     if (!sourceFile) return
     setStatus('converting')
     setErrorMsg(null)
+    setResultFormat(null)
+    setCustomName(null)
 
     const arrayBuffer = await sourceFile.arrayBuffer()
     const worker = new Worker('/workers/image-converter.worker.js')
@@ -331,6 +339,7 @@ export default function ImageConverterPage() {
       const blob: Blob = e.data.result
       setResultBlob(blob)
       setResultUrl(URL.createObjectURL(blob))
+      setResultFormat(e.data.format ?? targetFormat)
       setStatus('done')
     }
 
@@ -423,9 +432,11 @@ export default function ImageConverterPage() {
   // Derived values
   // ---------------------------------------------------------------------------
 
-  const outputName = sourceFile
-    ? `${sourceFile.name.replace(/\.[^.]+$/, '')}.${fileExtension(targetFormat)}`
-    : `converted.${fileExtension(targetFormat)}`
+  const effectiveFormat = resultFormat ?? targetFormat
+  const defaultOutputName = sourceFile
+    ? `${sourceFile.name.replace(/\.[^.]+$/, '')}.${fileExtension(effectiveFormat)}`
+    : `converted.${fileExtension(effectiveFormat)}`
+  const outputName = customName ?? defaultOutputName
 
   const enhancedName = outputName.replace(/(\.[^.]+)$/, '-enhanced$1')
 
@@ -560,7 +571,8 @@ export default function ImageConverterPage() {
               {/* GIF animation warning */}
               {isSourceGif && targetFormat !== 'gif' && (
                 <p className="text-xs text-amber-600 dark:text-amber-400" role="note">
-                  Animated GIFs will be flattened to the first frame. Choose GIF to keep animation.
+                  Browser canvas cannot encode animated images — only the first frame will be exported.
+                  Choose <strong>GIF</strong> to keep animation (resize will export as PNG instead).
                 </p>
               )}
             </div>
@@ -689,10 +701,26 @@ export default function ImageConverterPage() {
                     </span>
                   )}
                 </p>
+                {resultFormat && resultFormat !== targetFormat && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400" role="note">
+                    GIF resize exported as PNG — browser cannot re-encode animated GIF after resize.
+                  </p>
+                )}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor="output-filename">Output filename</label>
+                  <input
+                    id="output-filename"
+                    type="text"
+                    value={outputName}
+                    onChange={(e) => setCustomName(e.target.value || defaultOutputName)}
+                    className="w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    aria-label="Output filename"
+                  />
+                </div>
                 <a href={resultUrl} download={outputName}>
                   <Button type="button" variant="outline" className="w-full gap-2">
                     <Download className="h-4 w-4" aria-hidden="true" />
-                    Download {outputName}
+                    Download
                   </Button>
                 </a>
               </div>
