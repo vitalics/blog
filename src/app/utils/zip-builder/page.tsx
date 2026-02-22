@@ -485,7 +485,7 @@ export default function ArchiveBuilderPage() {
     const file = new File([blob], archiveName, { type: blob.type })
     // Call share() synchronously within the user gesture — no awaited work before it
     // to preserve transient activation (required by Safari)
-    navigator.share({ files: [file], title: archiveName }).catch(() => {})
+    navigator.share({ files: [file] }).catch(() => {})
   }
 
   return (

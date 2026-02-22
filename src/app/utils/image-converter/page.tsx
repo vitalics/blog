@@ -469,8 +469,10 @@ export default function ImageConverterPage() {
   const handleShare = (blob: Blob, filename: string) => {
     const file = new File([blob], filename, { type: blob.type })
     // Call share() synchronously within the user gesture — no awaited work before it
-    // to preserve transient activation (required by Safari)
-    navigator.share({ files: [file], title: filename }).catch(() => {})
+    // to preserve transient activation (required by Safari).
+    // Only pass `files` — mixing `title` with `files` causes some platforms
+    // (macOS Safari) to share only text and drop the file attachment.
+    navigator.share({ files: [file] }).catch(() => {})
   }
 
   // ---------------------------------------------------------------------------
