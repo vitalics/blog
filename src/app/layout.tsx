@@ -12,6 +12,7 @@ import { ViewTransitions } from '@/components/view-transitions'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ScrollToTop } from '@/components/scroll-to-top'
+import { ServiceWorker } from '@/components/service-worker'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -72,6 +73,7 @@ export default function RootLayout({
           <Footer />
           <ScrollToTop />
         </ThemeProvider>
+        <ServiceWorker />
         <Analytics />
         <SpeedInsights />
       </body>

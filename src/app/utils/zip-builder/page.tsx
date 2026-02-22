@@ -1,10 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Archive, Upload, Download, X, Copy, Check } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Archive, Upload, Download, X, Copy, Check, FolderOpen, List, GitBranch, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { FileTreeFolder, FileTreeFile } from '@/components/file-tree'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +15,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface FileEntry {
   id: string
   file: File
+  /** Relative path inside the archive, e.g. "src/utils/foo.ts" */
+  path: string
 }
 
 type OS = 'windows-ps' | 'windows-cmd' | 'mac' | 'linux'
@@ -105,6 +109,69 @@ const OS_TABS: { value: OS; label: string }[] = [
 ]
 
 // ---------------------------------------------------------------------------
+// Directory traversal via File and Directory Entries API
+// ---------------------------------------------------------------------------
+
+/** Recursively collect all files from a FileSystemDirectoryEntry. */
+function readDirectoryEntry(
+  entry: FileSystemDirectoryEntry,
+  prefix = '',
+): Promise<{ file: File; path: string }[]> {
+  return new Promise((resolve) => {
+    const reader = entry.createReader()
+    const results: { file: File; path: string }[] = []
+    const dirPath = prefix ? `${prefix}/${entry.name}` : entry.name
+
+    // readEntries may return results in batches — call until empty
+    const readBatch = () => {
+      reader.readEntries(async (entries) => {
+        if (entries.length === 0) {
+          resolve(results)
+          return
+        }
+        for (const e of entries) {
+          if (e.isFile) {
+            const file = await new Promise<File>((res) => (e as FileSystemFileEntry).file(res))
+            results.push({ file, path: `${dirPath}/${e.name}` })
+          } else if (e.isDirectory) {
+            const nested = await readDirectoryEntry(e as FileSystemDirectoryEntry, dirPath)
+            results.push(...nested)
+          }
+        }
+        readBatch()
+      })
+    }
+    readBatch()
+  })
+}
+
+/** Extract flat file+path pairs from a DataTransfer drop event. */
+async function extractDroppedEntries(
+  dataTransfer: DataTransfer,
+): Promise<{ file: File; path: string }[]> {
+  const results: { file: File; path: string }[] = []
+
+  const items = Array.from(dataTransfer.items)
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry?.()
+    if (!entry) {
+      // Fallback: no entry API — treat as flat file
+      const file = item.getAsFile()
+      if (file) results.push({ file, path: file.name })
+      continue
+    }
+    if (entry.isFile) {
+      const file = await new Promise<File>((res) => (entry as FileSystemFileEntry).file(res))
+      results.push({ file, path: file.name })
+    } else if (entry.isDirectory) {
+      const nested = await readDirectoryEntry(entry as FileSystemDirectoryEntry)
+      results.push(...nested)
+    }
+  }
+  return results
+}
+
+// ---------------------------------------------------------------------------
 // fflate — lazy import (code-split, loaded only when building)
 // ---------------------------------------------------------------------------
 
@@ -173,10 +240,66 @@ function buildTar(entries: { name: string; data: Uint8Array }[]): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------
+// Tree builder — converts flat paths into a nested structure for FileTree
+// ---------------------------------------------------------------------------
+
+interface TreeDir {
+  type: 'dir'
+  name: string
+  children: TreeNode[]
+}
+interface TreeFile {
+  type: 'file'
+  name: string
+}
+type TreeNode = TreeDir | TreeFile
+
+function buildTree(entries: FileEntry[]): TreeNode[] {
+  const root: TreeDir = { type: 'dir', name: '', children: [] }
+
+  for (const entry of entries) {
+    const parts = entry.path.split('/')
+    let current = root
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i]
+      let dir = current.children.find((n): n is TreeDir => n.type === 'dir' && n.name === part)
+      if (!dir) {
+        dir = { type: 'dir', name: part, children: [] }
+        current.children.push(dir)
+      }
+      current = dir
+    }
+    current.children.push({ type: 'file', name: parts[parts.length - 1] })
+  }
+
+  return root.children
+}
+
+function RenderTree({ nodes }: { nodes: TreeNode[] }) {
+  return (
+    <>
+      {nodes.map((node, i) => {
+        const key = `${node.type}-${node.name}-${i}`
+        if (node.type === 'dir') {
+          return (
+            <FileTreeFolder key={key} name={node.name} defaultOpen>
+              <RenderTree nodes={node.children} />
+            </FileTreeFolder>
+          )
+        }
+        return <FileTreeFile key={key} name={node.name} />
+      })}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function ArchiveBuilderPage() {
+  const router = useRouter()
+
   const [files, setFiles] = useState<FileEntry[]>([])
   const [format, setFormat] = useState<ArchiveFormat>('zip')
   const [archiveName, setArchiveName] = useState('archive.zip')
@@ -187,7 +310,9 @@ export default function ArchiveBuilderPage() {
   const [resultSize, setResultSize] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
   const [os, setOs] = useState<OS>('linux')
+  const [listMode, setListMode] = useState<'flat' | 'tree'>('flat')
   const inputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
   const resultUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -220,7 +345,7 @@ export default function ArchiveBuilderPage() {
     })
   }
 
-  const addFiles = useCallback((incoming: File[]) => {
+  const addFiles = useCallback((incoming: { file: File; path: string }[]) => {
     setStatus('idle')
     setErrorMsg(null)
     if (resultUrlRef.current) {
@@ -230,10 +355,10 @@ export default function ArchiveBuilderPage() {
     setResultUrl(null)
     setResultSize(null)
     setFiles((prev) => {
-      const existingNames = new Set(prev.map((e) => e.file.name))
+      const existingPaths = new Set(prev.map((e) => e.path))
       const fresh = incoming
-        .filter((f) => !existingNames.has(f.name))
-        .map((f) => ({ id: `${f.name}-${f.size}-${f.lastModified}`, file: f }))
+        .filter(({ path }) => !existingPaths.has(path))
+        .map(({ file, path }) => ({ id: `${path}-${file.size}-${file.lastModified}`, file, path }))
       return [...prev, ...fresh]
     })
   }, [])
@@ -245,18 +370,33 @@ export default function ArchiveBuilderPage() {
   }
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    async (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault()
       setIsDragOver(false)
-      const dropped = Array.from(e.dataTransfer.files)
-      if (dropped.length) addFiles(dropped)
+      const entries = await extractDroppedEntries(e.dataTransfer)
+      if (entries.length) addFiles(entries)
     },
     [addFiles],
   )
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? [])
-    if (selected.length) addFiles(selected)
+    const entries = selected.map((f) => ({
+      file: f,
+      path: f.webkitRelativePath || f.name,
+    }))
+    if (entries.length) addFiles(entries)
+    e.target.value = ''
+  }
+
+  const handleFolderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files ?? [])
+    const entries = selected.map((f) => ({
+      file: f,
+      // webkitRelativePath is always set for directory picks, e.g. "src/utils/foo.ts"
+      path: f.webkitRelativePath || f.name,
+    }))
+    if (entries.length) addFiles(entries)
     e.target.value = ''
   }
 
@@ -287,14 +427,14 @@ export default function ArchiveBuilderPage() {
         const entries: Record<string, Uint8Array> = {}
         for (const entry of files) {
           const buf = await entry.file.arrayBuffer()
-          entries[entry.file.name] = new Uint8Array(buf)
+          entries[entry.path] = new Uint8Array(buf)
         }
         output = fflate.zipSync(entries)
       } else if (format === 'tar.gz') {
         const tarEntries: { name: string; data: Uint8Array }[] = []
         for (const entry of files) {
           const buf = await entry.file.arrayBuffer()
-          tarEntries.push({ name: entry.file.name, data: new Uint8Array(buf) })
+          tarEntries.push({ name: entry.path, data: new Uint8Array(buf) })
         }
         const tar = buildTar(tarEntries)
         output = fflate.gzipSync(tar)
@@ -335,6 +475,9 @@ export default function ArchiveBuilderPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="mb-2 flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <Archive className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
             <h1 className="text-4xl font-bold">Archive Builder</h1>
           </div>
@@ -394,10 +537,30 @@ export default function ArchiveBuilderPage() {
           >
             <Upload className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
             <div>
-              <p className="font-medium">Drop files here</p>
+              <p className="font-medium">Drop files or folders here</p>
               <p className="text-sm text-muted-foreground">
-                or click to browse{!currentFormat.multiFile ? ' — single file only' : ' — any file type'}
+                or use the buttons below{!currentFormat.multiFile ? ' — single file only' : ''}
               </p>
+            </div>
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+              >
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                Files
+              </button>
+              {currentFormat.multiFile && (
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                  Folder
+                </button>
+              )}
             </div>
           </div>
           <input
@@ -409,41 +572,92 @@ export default function ArchiveBuilderPage() {
             tabIndex={-1}
             onChange={handleFileInput}
           />
+          <input
+            ref={folderInputRef}
+            type="file"
+            // @ts-expect-error — webkitdirectory is non-standard but widely supported
+            webkitdirectory=""
+            multiple
+            className="hidden"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={handleFolderInput}
+          />
 
           {/* File list */}
           {files.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{files.length} file{files.length !== 1 ? 's' : ''} &middot; {formatBytes(totalSize)} total</p>
-                <button
-                  type="button"
-                  onClick={() => { setFiles([]); setStatus('idle'); setErrorMsg(null) }}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Clear all
-                </button>
+                <div className="flex items-center gap-3">
+                  {/* Flat / Tree toggle */}
+                  <div className="flex rounded-md border text-xs overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setListMode('flat')}
+                      aria-pressed={listMode === 'flat'}
+                      className={[
+                        'flex items-center gap-1 px-2.5 py-1 transition-colors',
+                        listMode === 'flat'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                      ].join(' ')}
+                    >
+                      <List className="h-3 w-3" aria-hidden="true" />
+                      Flat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setListMode('tree')}
+                      aria-pressed={listMode === 'tree'}
+                      className={[
+                        'flex items-center gap-1 px-2.5 py-1 transition-colors',
+                        listMode === 'tree'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+                      ].join(' ')}
+                    >
+                      <GitBranch className="h-3 w-3" aria-hidden="true" />
+                      Tree
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setFiles([]); setStatus('idle'); setErrorMsg(null) }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
               </div>
-              <ul className="w-full divide-y rounded-lg border" aria-label="Files to archive">
-                {files.map((entry) => (
-                  <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                    <span className="flex-1 min-w-0 truncate font-mono text-xs">{entry.file.name}</span>
-                    <span className="shrink-0 text-muted-foreground">{formatBytes(entry.file.size)}</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(entry.id)}
-                          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive transition-colors"
-                          aria-label={`Remove ${entry.file.name}`}
-                        >
-                          <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Remove</TooltipContent>
-                    </Tooltip>
-                  </li>
-                ))}
-              </ul>
+
+              {listMode === 'flat' ? (
+                <ul className="w-full divide-y rounded-lg border" aria-label="Files to archive">
+                  {files.map((entry) => (
+                    <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                      <span className="flex-1 min-w-0 truncate font-mono text-xs" title={entry.path}>{entry.path}</span>
+                      <span className="shrink-0 text-muted-foreground">{formatBytes(entry.file.size)}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(entry.id)}
+                            className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                            aria-label={`Remove ${entry.file.name}`}
+                          >
+                            <X className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remove</TooltipContent>
+                      </Tooltip>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border bg-card p-3 font-mono text-sm">
+                  <RenderTree nodes={buildTree(files)} />
+                </div>
+              )}
             </div>
           )}
 

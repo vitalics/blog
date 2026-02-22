@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check, ArrowLeft } from 'lucide-react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,6 +113,8 @@ function maskApiKey(key: string): string {
 // ---------------------------------------------------------------------------
 
 export default function ImageConverterPage() {
+  const router = useRouter()
+
   // --- source image ---
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [sourcePreview, setSourcePreview] = useState<string | null>(null)
@@ -465,6 +468,9 @@ export default function ImageConverterPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="mb-2 flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <ImageIcon className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
             <h1 className="text-4xl font-bold">Image Converter</h1>
           </div>
