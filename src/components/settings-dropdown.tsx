@@ -410,7 +410,7 @@ export function SettingsDropdown() {
         aria-label="Settings"
         title="Settings"
       >
-        <Settings className="h-5 w-5" />
+        <Settings className={`h-5 w-5 transition-transform duration-200 ${isOpen ? "rotate-45" : ""}`} />
       </button>
 
       {isOpen && (

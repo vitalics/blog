@@ -4,8 +4,26 @@ import { getBlogPosts } from '@/lib/content'
 import { getAllAuthors } from '@/lib/authors'
 import type { SearchResult } from '@/lib/search'
 
+const UTILS_TOOLS: SearchResult[] = [
+  {
+    type: 'tool',
+    title: 'Image Converter',
+    description: 'Convert images between formats (PNG → WebP and more) entirely in your browser.',
+    url: '/utils/image-converter',
+  },
+  {
+    type: 'tool',
+    title: 'Archive Builder',
+    description: 'Pack files into ZIP, TAR.GZ, or GZip archives in your browser.',
+    url: '/utils/zip-builder',
+  },
+]
+
 export async function getSearchData(): Promise<SearchResult[]> {
   const results: SearchResult[] = []
+
+  // Add utility tools
+  results.push(...UTILS_TOOLS)
 
   // Add blog posts
   const posts = getBlogPosts()
