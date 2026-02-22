@@ -304,7 +304,7 @@ export default function ArchiveBuilderPage() {
         output = fflate.gzipSync(new Uint8Array(buf), { filename: files[0].file.name })
       }
 
-      const blob = new Blob([output], { type: def.mime })
+      const blob = new Blob([new Uint8Array(output).buffer as ArrayBuffer], { type: def.mime })
       const url = URL.createObjectURL(blob)
       resultUrlRef.current = url
       setResultUrl(url)
