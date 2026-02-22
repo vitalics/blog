@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Archive, Upload, Download, X, Copy, Check, FolderOpen, List, GitBranch, ArrowLeft } from 'lucide-react'
+import { Archive, Upload, Download, X, Copy, Check, FolderOpen, List, GitBranch, ArrowLeft, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -314,6 +314,7 @@ export default function ArchiveBuilderPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const resultUrlRef = useRef<string | null>(null)
+  const resultBlobRef = useRef<Blob | null>(null)
 
   useEffect(() => {
     setOs(detectOS())
@@ -447,6 +448,7 @@ export default function ArchiveBuilderPage() {
       const blob = new Blob([new Uint8Array(output).buffer as ArrayBuffer], { type: def.mime })
       const url = URL.createObjectURL(blob)
       resultUrlRef.current = url
+      resultBlobRef.current = blob
       setResultUrl(url)
       setResultSize(blob.size)
       setStatus('done')
@@ -468,6 +470,17 @@ export default function ArchiveBuilderPage() {
     ? Math.round(((totalSize - resultSize) / totalSize) * 100)
     : null
   const currentFormat = FORMATS.find((d) => d.value === format)!
+
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare
+
+  const handleShare = () => {
+    const blob = resultBlobRef.current
+    if (!blob) return
+    const file = new File([blob], archiveName, { type: blob.type })
+    // Call share() synchronously within the user gesture — no awaited work before it
+    // to preserve transient activation (required by Safari)
+    navigator.share({ files: [file], title: archiveName }).catch(() => {})
+  }
 
   return (
     <TooltipProvider>
@@ -706,12 +719,19 @@ export default function ArchiveBuilderPage() {
                     )}
                   </p>
                 </div>
-                <a href={resultUrl} download={archiveName}>
-                  <Button type="button" variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" aria-hidden="true" />
-                    Download
-                  </Button>
-                </a>
+                <div className="flex gap-2">
+                  <a href={resultUrl} download={archiveName}>
+                    <Button type="button" variant="outline" className="gap-2">
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                      Download
+                    </Button>
+                  </a>
+                  {canShare && (
+                    <Button type="button" variant="outline" size="icon" aria-label="Share" onClick={handleShare}>
+                      <Share2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Extract command */}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check, ArrowLeft } from 'lucide-react'
+import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check, ArrowLeft, Share2 } from 'lucide-react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -458,6 +458,15 @@ export default function ImageConverterPage() {
   const showModelDropdown = !isCustomProvider && models.length > 0
   const showModelTextInput = isCustomProvider
 
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare
+
+  const handleShare = (blob: Blob, filename: string) => {
+    const file = new File([blob], filename, { type: blob.type })
+    // Call share() synchronously within the user gesture — no awaited work before it
+    // to preserve transient activation (required by Safari)
+    navigator.share({ files: [file], title: filename }).catch(() => {})
+  }
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -723,12 +732,19 @@ export default function ImageConverterPage() {
                     aria-label="Output filename"
                   />
                 </div>
-                <a href={resultUrl} download={outputName}>
-                  <Button type="button" variant="outline" className="w-full gap-2">
-                    <Download className="h-4 w-4" aria-hidden="true" />
-                    Download
-                  </Button>
-                </a>
+                <div className="flex gap-2">
+                  <a href={resultUrl} download={outputName} className="flex-1">
+                    <Button type="button" variant="outline" className="w-full gap-2">
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                      Download
+                    </Button>
+                  </a>
+                  {canShare && (
+                    <Button type="button" variant="outline" size="icon" aria-label="Share" onClick={() => handleShare(resultBlob, outputName)}>
+                      <Share2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -990,12 +1006,19 @@ export default function ImageConverterPage() {
                   <p className="text-sm text-muted-foreground">
                     {enhancedName} &middot; {formatBytes(enhancedBlob.size)}
                   </p>
-                  <a href={enhancedUrl} download={enhancedName}>
-                    <Button type="button" variant="outline" className="w-full gap-2">
-                      <Download className="h-4 w-4" aria-hidden="true" />
-                      Download {enhancedName}
-                    </Button>
-                  </a>
+                  <div className="flex gap-2">
+                    <a href={enhancedUrl} download={enhancedName} className="flex-1">
+                      <Button type="button" variant="outline" className="w-full gap-2">
+                        <Download className="h-4 w-4" aria-hidden="true" />
+                        Download {enhancedName}
+                      </Button>
+                    </a>
+                    {canShare && (
+                      <Button type="button" variant="outline" size="icon" aria-label="Share" onClick={() => handleShare(enhancedBlob, enhancedName)}>
+                        <Share2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
