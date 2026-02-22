@@ -138,6 +138,7 @@ export default function ImageConverterPage() {
   const [resultFormat, setResultFormat] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [customName, setCustomName] = useState<string | null>(null)
+  const [canShare, setCanShare] = useState(false)
 
   // --- AI enhancer ---
   const [aiEnabled, setAiEnabled] = useState(false)
@@ -344,6 +345,13 @@ export default function ImageConverterPage() {
       setResultUrl(URL.createObjectURL(blob))
       setResultFormat(e.data.format ?? targetFormat)
       setStatus('done')
+      // Test with the real blob — desktop Chrome has navigator.share but returns
+      // false for canShare({ files }) so the button stays hidden there
+      setCanShare(
+        !!navigator.share &&
+        !!navigator.canShare &&
+        navigator.canShare({ files: [new File([blob], 'test', { type: blob.type })] })
+      )
     }
 
     worker.onerror = (e) => {
@@ -457,8 +465,6 @@ export default function ImageConverterPage() {
   const isCustomProvider = aiProvider === 'custom'
   const showModelDropdown = !isCustomProvider && models.length > 0
   const showModelTextInput = isCustomProvider
-
-  const canShare = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare
 
   const handleShare = (blob: Blob, filename: string) => {
     const file = new File([blob], filename, { type: blob.type })

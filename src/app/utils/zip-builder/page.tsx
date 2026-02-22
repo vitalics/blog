@@ -308,6 +308,7 @@ export default function ArchiveBuilderPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [resultSize, setResultSize] = useState<number | null>(null)
+  const [canShare, setCanShare] = useState(false)
   const [copied, setCopied] = useState(false)
   const [os, setOs] = useState<OS>('linux')
   const [listMode, setListMode] = useState<'flat' | 'tree'>('flat')
@@ -450,6 +451,13 @@ export default function ArchiveBuilderPage() {
       resultUrlRef.current = url
       resultBlobRef.current = blob
       setResultUrl(url)
+      // Test with the real blob — desktop Chrome has navigator.share but returns
+      // false for canShare({ files }) so the button stays hidden there
+      setCanShare(
+        !!navigator.share &&
+        !!navigator.canShare &&
+        navigator.canShare({ files: [new File([blob], archiveName, { type: blob.type })] })
+      )
       setResultSize(blob.size)
       setStatus('done')
     } catch (err) {
@@ -470,8 +478,6 @@ export default function ArchiveBuilderPage() {
     ? Math.round(((totalSize - resultSize) / totalSize) * 100)
     : null
   const currentFormat = FORMATS.find((d) => d.value === format)!
-
-  const canShare = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare
 
   const handleShare = () => {
     const blob = resultBlobRef.current
