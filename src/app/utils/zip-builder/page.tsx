@@ -423,10 +423,10 @@ export default function ArchiveBuilderPage() {
                   Clear all
                 </button>
               </div>
-              <ul className="divide-y rounded-lg border" aria-label="Files to archive">
+              <ul className="w-full divide-y rounded-lg border" aria-label="Files to archive">
                 {files.map((entry) => (
                   <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                    <span className="min-w-0 truncate font-mono text-xs">{entry.file.name}</span>
+                    <span className="flex-1 min-w-0 truncate font-mono text-xs">{entry.file.name}</span>
                     <span className="shrink-0 text-muted-foreground">{formatBytes(entry.file.size)}</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
