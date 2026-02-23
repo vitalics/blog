@@ -1420,7 +1420,7 @@ export default function PdfViewerPage() {
     setIsExporting(true)
     try {
       const bytes = await buildAnnotatedPdfBytes()
-      const blob = new Blob([bytes], { type: 'application/pdf' })
+      const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -1455,7 +1455,7 @@ export default function PdfViewerPage() {
     const timer = setTimeout(() => {
       buildAnnotatedPdfBytes().then((bytes) => {
         if (!cancelled) {
-          shareFileRef.current = new File([bytes], name, { type: 'application/pdf' })
+          shareFileRef.current = new File([bytes.buffer as ArrayBuffer], name, { type: 'application/pdf' })
           setShareReady(true)
         }
       }).catch(() => {})
@@ -1485,7 +1485,7 @@ export default function PdfViewerPage() {
     pdfDoc.addPage([595, 842]) // A4
     const bytes = await pdfDoc.save()
     const name = (newPdfName.trim() || 'document').replace(/\.pdf$/i, '') + '.pdf'
-    const file = new File([bytes], name, { type: 'application/pdf' })
+    const file = new File([bytes.buffer as ArrayBuffer], name, { type: 'application/pdf' })
     handleFile(file)
   }
 
@@ -1502,8 +1502,8 @@ export default function PdfViewerPage() {
     const pdfDoc = await PDFDocument.load(pdfBytesRef.current)
     pdfDoc.insertPage(currentPage, [viewport.width, viewport.height])
     const bytes = await pdfDoc.save()
-    pdfBytesRef.current = bytes
-    const newFile = new File([bytes], pdfFile.name, { type: 'application/pdf' })
+    pdfBytesRef.current = bytes.buffer as ArrayBuffer
+    const newFile = new File([bytes.buffer as ArrayBuffer], pdfFile.name, { type: 'application/pdf' })
     setPdfFile(newFile)
     // Reload pdfjs doc
     const pdfjsLib = await import('pdfjs-dist')
@@ -1534,8 +1534,8 @@ export default function PdfViewerPage() {
       pdfDoc.removePage(0)
       pdfDoc.addPage([595, 842])
       const bytes = await pdfDoc.save()
-      pdfBytesRef.current = bytes
-      const newFile = new File([bytes], pdfFile.name, { type: 'application/pdf' })
+      pdfBytesRef.current = bytes.buffer as ArrayBuffer
+      const newFile = new File([bytes.buffer as ArrayBuffer], pdfFile.name, { type: 'application/pdf' })
       setPdfFile(newFile)
       const pdfjsLib = await import('pdfjs-dist')
       const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise
@@ -1547,8 +1547,8 @@ export default function PdfViewerPage() {
 
     pdfDoc.removePage(currentPage - 1)
     const bytes = await pdfDoc.save()
-    pdfBytesRef.current = bytes
-    const newFile = new File([bytes], pdfFile.name, { type: 'application/pdf' })
+    pdfBytesRef.current = bytes.buffer as ArrayBuffer
+    const newFile = new File([bytes.buffer as ArrayBuffer], pdfFile.name, { type: 'application/pdf' })
     setPdfFile(newFile)
     const pdfjsLib = await import('pdfjs-dist')
     const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise
