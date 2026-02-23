@@ -15,6 +15,8 @@ import { ColorPicker } from '@/components/ui/color-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Kbd, KbdGroup } from '@/components/ui/kbd'
 
 // ---------------------------------------------------------------------------
 // IndexedDB — multi-session persistence
@@ -152,6 +154,9 @@ const OCR_LANGUAGES = [
   { value: 'jpn', label: 'Japanese' },
   { value: 'kor', label: 'Korean' },
 ] as const
+
+// Helper to detect macOS for keyboard shortcut display
+const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
 // Searchable combobox for OCR language selection
 function OcrLangSelect({ value, onChange, size = 'md' }: {
@@ -297,6 +302,9 @@ function isShape(a: Annotation): a is ShapeAnnotation {
 function isDraw(a: Annotation): a is DrawAnnotation {
   return 'points' in a
 }
+function isText(a: Annotation): a is TextAnnotation {
+  return 'text' in a && !isShape(a) && !isDraw(a) && !isImage(a) && !isSignature(a)
+}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -350,6 +358,10 @@ export default function PdfViewerPage() {
 
   // Editor state
   const [mode, setMode] = useState<EditorMode>('select')
+  // Text input state for right panel
+  const [panelText, setPanelText] = useState('')
+  // Canvas dimensions state for proper annotation re-rendering on zoom
+  const [canvasDimensions, setCanvasDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -382,6 +394,13 @@ export default function PdfViewerPage() {
   const [renameValue, setRenameValue] = useState('')
   const sigCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const sigIsDrawingRef = useRef(false)
+  const sigUndoStack = useRef<ImageData[]>([])
+  const sigRedoStack = useRef<ImageData[]>([])
+
+  // Clipboard for copy/cut/paste
+  const clipboardRef = useRef<Annotation | null>(null)
+
+
 
   // Full-page OCR state
   const [pageOcrStatus, setPageOcrStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
@@ -400,6 +419,8 @@ export default function PdfViewerPage() {
   // Area selection rubber-band
   const [selectRect, setSelectRect] = useState<SelectRect | null>(null)
   const selectStartRef = useRef<{ x: number; y: number } | null>(null)
+
+
 
   // Session persistence
   const [sessionSaved, setSessionSaved] = useState(false)
@@ -435,6 +456,11 @@ export default function PdfViewerPage() {
   const totalPagesRef = useRef(totalPages)
   const scaleRef = useRef(scale)
   const pdfFileRef = useRef(pdfFile)
+  
+  // Pan offset for middle mouse button panning
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
 
   // Keep all refs in sync with state
   useEffect(() => { annotationsRef.current = annotations }, [annotations])
@@ -459,12 +485,13 @@ export default function PdfViewerPage() {
     } else if (isDraw(ann)) {
       setNewStrokeColor(ann.strokeColor)
       setNewStrokeWidth(ann.strokeWidth)
-    } else if (!isImage(ann) && !isSignature(ann)) {
+    } else if (!isImage(ann) && ann && !isSignature(ann)) {
       setNewFontSize(ann.fontSize)
       setNewColor(ann.color)
       setNewBgColor(ann.bgColor)
+      setPanelText(ann.text)
     }
-  }, [selectedId])
+  }, [selectedId, annotations])
 
   // Show generator panel when mode changes to add-qr or add-barcode
   useEffect(() => {
@@ -520,10 +547,10 @@ export default function PdfViewerPage() {
     setTimeout(() => setSessionSaved(false), 2000)
   }, [status])
 
-  // Auto-save every 5 seconds while a PDF is open
+  // Auto-save every 30 seconds while a PDF is open
   useEffect(() => {
     if (status !== 'ready' || !pdfFileRef.current) return
-    const intervalId = setInterval(() => { saveCurrentSession().catch(() => {}) }, 5000)
+    const intervalId = setInterval(() => { saveCurrentSession().catch(() => {}) }, 30000)
     return () => clearInterval(intervalId)
   }, [status, saveCurrentSession])
 
@@ -559,17 +586,7 @@ export default function PdfViewerPage() {
     setCanRedo(redoStack.current.length > 0)
   }, [])
 
-  // Keyboard shortcuts: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y = redo
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey
-      if (!mod) return
-      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
-      if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo() }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  // Undo/redo keyboard shortcuts are handled in the consolidated keyboard handler below
 
   // Reset history when a new PDF is loaded
   const resetHistory = useCallback(() => {
@@ -646,6 +663,8 @@ export default function PdfViewerPage() {
         if (!ctx || cancelled) return
         canvas.width = viewport.width
         canvas.height = viewport.height
+        // Update canvas dimensions state for annotations
+        setCanvasDimensions({ width: viewport.width, height: viewport.height })
         const renderTask = page.render({ canvasContext: ctx, viewport })
         renderTaskRef.current = renderTask
         await renderTask.promise
@@ -680,10 +699,10 @@ export default function PdfViewerPage() {
   // Viewer controls
   // ---------------------------------------------------------------------------
 
-  const goToPrev = () => { setCurrentPage((p) => Math.max(1, p - 1)); setSelectedId(null); setEditingId(null); setPageOcrStatus('idle'); setPageOcrText('') }
-  const goToNext = () => { setCurrentPage((p) => Math.min(totalPages, p + 1)); setSelectedId(null); setEditingId(null); setPageOcrStatus('idle'); setPageOcrText('') }
-  const zoomOut = () => setScale((s) => Math.max(SCALE_MIN, +(s - SCALE_STEP).toFixed(2)))
-  const zoomIn = () => setScale((s) => Math.min(SCALE_MAX, +(s + SCALE_STEP).toFixed(2)))
+  const goToPrev = useCallback(() => { setCurrentPage((p) => Math.max(1, p - 1)); setSelectedId(null); setEditingId(null); setPageOcrStatus('idle'); setPageOcrText('') }, [])
+  const goToNext = useCallback(() => { setCurrentPage((p) => Math.min(totalPages, p + 1)); setSelectedId(null); setEditingId(null); setPageOcrStatus('idle'); setPageOcrText('') }, [totalPages])
+  const zoomOut = useCallback(() => setScale((s) => Math.max(SCALE_MIN, +(s - SCALE_STEP).toFixed(2))), [])
+  const zoomIn = useCallback(() => setScale((s) => Math.min(SCALE_MAX, +(s + SCALE_STEP).toFixed(2))), [])
 
   const handleClear = () => {
     setPdfFile(null); setStatus('idle'); setErrorMsg(null); setCurrentPage(1)
@@ -735,12 +754,56 @@ export default function PdfViewerPage() {
     ctx.stroke()
   }
 
-  const handleSigPointerUp = () => { sigIsDrawingRef.current = false }
+  const handleSigPointerUp = () => { 
+    sigIsDrawingRef.current = false
+    // Save state after stroke is complete
+    const canvas = sigCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    sigUndoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
+    sigRedoStack.current = []
+  }
 
   const clearSigCanvas = () => {
     const canvas = sigCanvasRef.current; if (!canvas) return
-    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    // Save current state before clearing
+    sigUndoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
+    sigRedoStack.current = []
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
+  
+  const sigUndo = useCallback(() => {
+    const canvas = sigCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    if (sigUndoStack.current.length === 0) return
+    // Save current state to redo stack
+    sigRedoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
+    // Restore previous state
+    const prevState = sigUndoStack.current.pop()
+    if (prevState) {
+      ctx.putImageData(prevState, 0, 0)
+    }
+  }, [])
+  
+  const sigRedo = useCallback(() => {
+    const canvas = sigCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    if (sigRedoStack.current.length === 0) return
+    // Save current state to undo stack
+    sigUndoStack.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height))
+    // Restore next state
+    const nextState = sigRedoStack.current.pop()
+    if (nextState) {
+      ctx.putImageData(nextState, 0, 0)
+    }
+  }, [])
 
   const saveSignature = async () => {
     const canvas = sigCanvasRef.current; if (!canvas) return
@@ -1199,19 +1262,237 @@ export default function PdfViewerPage() {
   // Delete selected annotation
   // ---------------------------------------------------------------------------
 
-  const deleteSelected = () => {
+  const deleteSelected = useCallback(() => {
     if (!selectedId) return
     pushHistory(annotationsRef.current.filter((a) => a.id !== selectedId))
     setSelectedId(null); setEditingId(null)
-  }
+  }, [selectedId, pushHistory])
 
+  // ---------------------------------------------------------------------------
+  // Clipboard operations: copy, cut, paste
+  // ---------------------------------------------------------------------------
+
+  const copySelected = useCallback(() => {
+    if (!selectedId) return
+    const ann = annotationsRef.current.find((a) => a.id === selectedId)
+    if (!ann) return
+    clipboardRef.current = JSON.parse(JSON.stringify(ann)) // deep clone
+  }, [selectedId])
+
+  const cutSelected = useCallback(() => {
+    if (!selectedId) return
+    copySelected()
+    deleteSelected()
+  }, [selectedId, copySelected, deleteSelected])
+
+  const pasteAnnotation = useCallback(() => {
+    if (!clipboardRef.current) return
+    const cloned = JSON.parse(JSON.stringify(clipboardRef.current)) as Annotation
+    // Generate new ID and offset position slightly
+    cloned.id = uid()
+    cloned.page = currentPage
+    // Offset by a small amount (2% of canvas) for visual feedback
+    if ('xRatio' in cloned) {
+      cloned.xRatio = Math.min(1, (cloned.xRatio as number) + 0.02)
+      cloned.yRatio = Math.min(1, (cloned.yRatio as number) + 0.02)
+    }
+    if ('points' in cloned) {
+      cloned.points = cloned.points.map((p: { x: number; y: number }) => ({
+        x: Math.min(1, p.x + 0.02),
+        y: Math.min(1, p.y + 0.02),
+      }))
+    }
+    pushHistory([...annotationsRef.current, cloned])
+    setSelectedId(cloned.id)
+  }, [currentPage, pushHistory])
+
+  // ---------------------------------------------------------------------------
+  // Save session shortcut
+  // ---------------------------------------------------------------------------
+
+  const handleSave = useCallback(async () => {
+    await saveCurrentSession()
+  }, [saveCurrentSession])
+
+  // ---------------------------------------------------------------------------
+  // Create text node shortcut
+  // ---------------------------------------------------------------------------
+
+  const createTextNode = useCallback(() => {
+    // Create text node at center of current page
+    const annotation: TextAnnotation = {
+      id: uid(),
+      page: currentPage,
+      xRatio: 0.5,
+      yRatio: 0.5,
+      text: 'Text',
+      fontSize: newFontSize,
+      color: newColor,
+      bgColor: newBgColor,
+    }
+    pushHistory([...annotationsRef.current, annotation])
+    setSelectedId(annotation.id)
+    // Delay setting editing mode to prevent keypress from being typed
+    setTimeout(() => setEditingId(annotation.id), 10)
+  }, [currentPage, newFontSize, newColor, newBgColor, pushHistory])
+
+  // Consolidated keyboard shortcuts handler
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && editingId !== selectedId) deleteSelected()
+      const mod = e.ctrlKey || e.metaKey
+      const target = e.target as HTMLElement
+      
+      // Signature modal undo/redo (takes precedence when modal is open)
+      if (showSigModal && sigDrawing) {
+        if (mod && e.key === 'z' && !e.shiftKey) {
+          e.preventDefault()
+          sigUndo()
+          return
+        }
+        if (mod && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
+          e.preventDefault()
+          sigRedo()
+          return
+        }
+      }
+      
+      // Don't trigger shortcuts when typing in input/textarea
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
+      // Ctrl/Cmd + Z - Undo
+      if (mod && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+        return
+      }
+
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y - Redo
+      if (mod && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
+        e.preventDefault()
+        redo()
+        return
+      }
+
+      // Ctrl/Cmd + C - Copy
+      if (mod && e.key === 'c' && selectedId) {
+        e.preventDefault()
+        copySelected()
+        return
+      }
+
+      // Ctrl/Cmd + X - Cut
+      if (mod && e.key === 'x' && selectedId) {
+        e.preventDefault()
+        cutSelected()
+        return
+      }
+
+      // Ctrl/Cmd + V - Paste
+      if (mod && e.key === 'v' && clipboardRef.current) {
+        e.preventDefault()
+        pasteAnnotation()
+        return
+      }
+
+      // Ctrl/Cmd + S - Save
+      if (mod && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+        return
+      }
+
+      // Delete/Backspace - delete selected annotation
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && editingId !== selectedId) {
+        deleteSelected()
+        return
+      }
+
+      // T key - Toggle text mode (only when not in text editing mode)
+      if (e.key === 't' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        e.stopPropagation()
+        setMode(mode === 'add-text' ? 'select' : 'add-text')
+        return
+      }
+
+      // B key - Toggle barcode mode
+      if (e.key === 'b' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        setMode(mode === 'add-barcode' ? 'select' : 'add-barcode')
+        return
+      }
+
+      // Q key - Toggle QR code mode
+      if (e.key === 'q' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        setMode(mode === 'add-qr' ? 'select' : 'add-qr')
+        return
+      }
+
+      // O key - Toggle OCR text mode
+      if (e.key === 'o' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        setMode(mode === 'area-ocr' ? 'select' : 'area-ocr')
+        return
+      }
+
+      // + or = key - Zoom in
+      if ((e.key === '+' || e.key === '=') && !mod && pdfFile) {
+        e.preventDefault()
+        zoomIn()
+        return
+      }
+
+      // - key - Zoom out
+      if (e.key === '-' && !mod && pdfFile) {
+        e.preventDefault()
+        zoomOut()
+        return
+      }
+
+      // ArrowRight - Next page
+      if (e.key === 'ArrowRight' && !mod && pdfFile && currentPage < totalPages) {
+        e.preventDefault()
+        goToNext()
+        return
+      }
+
+      // ArrowLeft - Previous page
+      if (e.key === 'ArrowLeft' && !mod && pdfFile && currentPage > 1) {
+        e.preventDefault()
+        goToPrev()
+        return
+      }
+
+      // R key - Rectangle mode
+      if (e.key === 'r' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        setShapeType('rect')
+        setMode(mode === 'add-shape' && shapeType === 'rect' ? 'select' : 'add-shape')
+        return
+      }
+
+      // C key - Circle mode
+      if (e.key === 'c' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        setShapeType('circle')
+        setMode(mode === 'add-shape' && shapeType === 'circle' ? 'select' : 'add-shape')
+        return
+      }
+
+      // L key - Line mode
+      if (e.key === 'l' && !mod && editingId === null && pdfFile) {
+        e.preventDefault()
+        setShapeType('line')
+        setMode(mode === 'add-shape' && shapeType === 'line' ? 'select' : 'add-shape')
+        return
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, editingId])
+  }, [selectedId, editingId, pdfFile, undo, redo, copySelected, cutSelected, pasteAnnotation, handleSave, deleteSelected, showSigModal, sigDrawing, sigUndo, sigRedo, mode, currentPage, totalPages, zoomIn, zoomOut, goToNext, goToPrev, shapeType])
 
   // ---------------------------------------------------------------------------
   // Generate QR and place as image annotation
@@ -1568,12 +1849,12 @@ export default function PdfViewerPage() {
 
   const updateSelected = (patch: Partial<TextAnnotation>) => {
     if (!selectedId) return
-    setAnnotations((prev) => prev.map((a) => a.id === selectedId && !isImage(a) ? { ...a, ...patch } : a))
+    setAnnotations((prev) => prev.map((a) => a.id === selectedId && isText(a) ? { ...a, ...patch } : a))
   }
 
   const commitSelectedUpdate = (patch: Partial<TextAnnotation>) => {
     if (!selectedId) return
-    const next = annotationsRef.current.map((a) => a.id === selectedId && !isImage(a) ? { ...a, ...patch } : a)
+    const next = annotationsRef.current.map((a) => a.id === selectedId && isText(a) ? { ...a, ...patch } : a)
     pushHistory(next)
   }
 
@@ -1593,7 +1874,7 @@ export default function PdfViewerPage() {
   }
 
   const selectedAnn = annotations.find((a) => a.id === selectedId)
-  const selectedIsText = selectedAnn ? !isImage(selectedAnn) && !isSignature(selectedAnn) && !isShape(selectedAnn) && !isDraw(selectedAnn) : false
+  const selectedIsText = selectedAnn ? isText(selectedAnn) : false
   const selectedIsShape = selectedAnn ? isShape(selectedAnn) : false
   const selectedIsDraw = selectedAnn ? isDraw(selectedAnn) : false
 
@@ -1611,6 +1892,7 @@ export default function PdfViewerPage() {
   // ---------------------------------------------------------------------------
 
   return (
+    <TooltipProvider>
     <div className="mx-auto max-w-7xl px-4 py-12">
       {/* Header */}
       <div className="mb-6">
@@ -1748,17 +2030,57 @@ export default function PdfViewerPage() {
               </Button>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
-                <Undo2 className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
-                <Redo2 className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={undo} disabled={!canUndo} aria-label="Undo">
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex items-center gap-2">
+                    <span>Undo</span>
+                    <KbdGroup>
+                      <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+                      <Kbd>Z</Kbd>
+                    </KbdGroup>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={redo} disabled={!canRedo} aria-label="Redo">
+                    <Redo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex items-center gap-2">
+                    <span>Redo</span>
+                    <KbdGroup>
+                      <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+                      <Kbd>Shift</Kbd>
+                      <Kbd>Z</Kbd>
+                    </KbdGroup>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" onClick={() => saveCurrentSession().catch(() => {})} aria-label="Save session" title="Save now">
-                <Save className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => saveCurrentSession().catch(() => {})} aria-label="Save session">
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex items-center gap-2">
+                    <span>Save</span>
+                    <KbdGroup>
+                      <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+                      <Kbd>S</Kbd>
+                    </KbdGroup>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
               {canShare && (
                 <Button variant="outline" size="icon" onClick={handleShare} disabled={isSharing || !shareReady} aria-label="Share PDF" title={shareReady ? 'Share PDF' : 'Preparing…'}>
                   <Share2 className={['h-4 w-4', isSharing ? 'animate-pulse' : !shareReady ? 'opacity-40' : ''].join(' ')} />
@@ -1971,7 +2293,7 @@ export default function PdfViewerPage() {
                       <MousePointer className="h-4 w-4" /> Select
                     </Button>
                     <Button variant={mode === 'add-text' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2"
-                      onClick={() => setMode('add-text')}>
+                      onClick={() => setMode('add-text')} title="Add text (T)">
                       <Type className="h-4 w-4" /> Text
                     </Button>
                     <Button variant={mode === 'area-scan' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2"
@@ -1990,32 +2312,32 @@ export default function PdfViewerPage() {
                     <div className="my-1 h-px w-full bg-border" />
 
                     <Button variant={mode === 'add-qr' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2"
-                      onClick={() => setMode(mode === 'add-qr' ? 'select' : 'add-qr')}>
+                      onClick={() => setMode(mode === 'add-qr' ? 'select' : 'add-qr')} title="Add QR code (Q)">
                       <QrCode className="h-4 w-4" /> QR Code
                     </Button>
                     <Button variant={mode === 'add-barcode' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2"
-                      onClick={() => setMode(mode === 'add-barcode' ? 'select' : 'add-barcode')}>
+                      onClick={() => setMode(mode === 'add-barcode' ? 'select' : 'add-barcode')} title="Add barcode (B)">
                       <Barcode className="h-4 w-4" /> Barcode
                     </Button>
 
                     <div className="my-1 h-px w-full bg-border" />
 
                     <Button variant={mode === 'add-shape' ? 'secondary' : 'ghost'} size="sm" className="w-full justify-start gap-2"
-                      onClick={() => setMode(mode === 'add-shape' ? 'select' : 'add-shape')}>
+                      onClick={() => setMode(mode === 'add-shape' ? 'select' : 'add-shape')} title="Add shape (R/C/L)">
                       <Shapes className="h-4 w-4" /> Shape
                     </Button>
                     {mode === 'add-shape' && (
                       <div className="ml-6 flex gap-1">
                         <Button variant={shapeType === 'rect' ? 'secondary' : 'ghost'} size="icon"
-                          title="Rectangle" onClick={() => setShapeType('rect')} className="h-7 w-7">
+                          title="Rectangle (R)" onClick={() => setShapeType('rect')} className="h-7 w-7">
                           <Square className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant={shapeType === 'circle' ? 'secondary' : 'ghost'} size="icon"
-                          title="Circle" onClick={() => setShapeType('circle')} className="h-7 w-7">
+                          title="Circle (C)" onClick={() => setShapeType('circle')} className="h-7 w-7">
                           <Circle className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant={shapeType === 'line' ? 'secondary' : 'ghost'} size="icon"
-                          title="Line / Arrow" onClick={() => setShapeType('line')} className="h-7 w-7">
+                          title="Line / Arrow (L)" onClick={() => setShapeType('line')} className="h-7 w-7">
                           <Minus className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -2037,91 +2359,195 @@ export default function PdfViewerPage() {
             <aside className="hidden w-14 flex-col items-center gap-1 rounded-lg border bg-card p-1.5 lg:flex">
               <span className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Tools</span>
 
-              <Button variant={mode === 'select' ? 'secondary' : 'ghost'} size="icon"
-                title="Select / move" aria-label="Select mode"
-                onClick={() => setMode('select')} className="h-9 w-9">
-                <MousePointer className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'select' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Select mode"
+                    onClick={() => setMode('select')} className="h-9 w-9">
+                    <MousePointer className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="flex items-center gap-2">
+                    <span>Select / move</span>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
 
-              <Button variant={mode === 'add-text' ? 'secondary' : 'ghost'} size="icon"
-                title="Add text" aria-label="Add text"
-                onClick={() => setMode('add-text')} className="h-9 w-9">
-                <Type className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'add-text' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Add text"
+                    onClick={() => setMode('add-text')} className="h-9 w-9">
+                    <Type className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="flex items-center gap-2">
+                    <span>Add text</span>
+                    <Kbd>T</Kbd>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
 
-              <Button variant={mode === 'area-scan' ? 'secondary' : 'ghost'} size="icon"
-                title="Scan area for QR / barcode" aria-label="Scan QR/barcode"
-                onClick={() => setMode('area-scan')} className="h-9 w-9">
-                <ScanLine className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'area-scan' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Scan QR/barcode"
+                    onClick={() => setMode('area-scan')} className="h-9 w-9">
+                    <ScanLine className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Scan area for QR / barcode</TooltipContent>
+              </Tooltip>
 
-              <Button variant={mode === 'area-ocr' ? 'secondary' : 'ghost'} size="icon"
-                title="Extract text with OCR" aria-label="OCR text extraction"
-                onClick={() => setMode('area-ocr')} className="h-9 w-9">
-                <CaseSensitive className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'area-ocr' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="OCR text extraction"
+                    onClick={() => setMode('area-ocr')} className="h-9 w-9">
+                    <CaseSensitive className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Extract text with OCR</TooltipContent>
+              </Tooltip>
 
-              <Button variant={pageOcrStatus === 'running' ? 'secondary' : 'ghost'} size="icon"
-                title="Extract all text from page" aria-label="Full-page OCR"
-                disabled={pageOcrStatus === 'running'}
-                onClick={handlePageOcr} className="h-9 w-9">
-                <FileSearch className={['h-4 w-4', pageOcrStatus === 'running' ? 'animate-pulse' : ''].join(' ')} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={pageOcrStatus === 'running' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Full-page OCR"
+                    disabled={pageOcrStatus === 'running'}
+                    onClick={handlePageOcr} className="h-9 w-9">
+                    <FileSearch className={['h-4 w-4', pageOcrStatus === 'running' ? 'animate-pulse' : ''].join(' ')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Extract all text from page</TooltipContent>
+              </Tooltip>
 
               <div className="my-0.5 h-px w-full bg-border" />
 
-              <Button variant={mode === 'add-qr' ? 'secondary' : 'ghost'} size="icon"
-                title="Insert QR code" aria-label="Generate QR code"
-                onClick={() => setMode(mode === 'add-qr' ? 'select' : 'add-qr')} className="h-9 w-9">
-                <QrCode className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'add-qr' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Generate QR code"
+                    onClick={() => setMode(mode === 'add-qr' ? 'select' : 'add-qr')} className="h-9 w-9">
+                    <QrCode className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="flex items-center gap-2">
+                    <span>Insert QR code</span>
+                    <Kbd>Q</Kbd>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
 
-              <Button variant={mode === 'add-barcode' ? 'secondary' : 'ghost'} size="icon"
-                title="Insert barcode" aria-label="Generate barcode"
-                onClick={() => setMode(mode === 'add-barcode' ? 'select' : 'add-barcode')} className="h-9 w-9">
-                <Barcode className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'add-barcode' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Generate barcode"
+                    onClick={() => setMode(mode === 'add-barcode' ? 'select' : 'add-barcode')} className="h-9 w-9">
+                    <Barcode className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="flex items-center gap-2">
+                    <span>Insert barcode</span>
+                    <Kbd>B</Kbd>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
 
               <div className="my-0.5 h-px w-full bg-border" />
 
-              <Button variant={mode === 'add-shape' ? 'secondary' : 'ghost'} size="icon"
-                title="Draw shape" aria-label="Draw shape"
-                onClick={() => setMode(mode === 'add-shape' ? 'select' : 'add-shape')} className="h-9 w-9">
-                <Shapes className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'add-shape' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Draw shape"
+                    onClick={() => setMode(mode === 'add-shape' ? 'select' : 'add-shape')} className="h-9 w-9">
+                    <Shapes className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="flex items-center gap-2">
+                    <span>Draw shape</span>
+                    <Kbd>R</Kbd>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
 
               {/* Shape sub-tools — shown when add-shape is active */}
               {mode === 'add-shape' && (
                 <>
-                  <Button variant={shapeType === 'rect' ? 'secondary' : 'ghost'} size="icon"
-                    title="Rectangle" aria-label="Rectangle"
-                    onClick={() => setShapeType('rect')} className="h-7 w-7">
-                    <Square className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant={shapeType === 'circle' ? 'secondary' : 'ghost'} size="icon"
-                    title="Circle / Ellipse" aria-label="Circle"
-                    onClick={() => setShapeType('circle')} className="h-7 w-7">
-                    <Circle className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant={shapeType === 'line' ? 'secondary' : 'ghost'} size="icon"
-                    title="Line / Arrow" aria-label="Line"
-                    onClick={() => setShapeType('line')} className="h-7 w-7">
-                    <Minus className="h-3.5 w-3.5" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant={shapeType === 'rect' ? 'secondary' : 'ghost'} size="icon"
+                        aria-label="Rectangle"
+                        onClick={() => setShapeType('rect')} className="h-7 w-7">
+                        <Square className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex items-center gap-2">
+                        <span>Rectangle</span>
+                        <Kbd>R</Kbd>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant={shapeType === 'circle' ? 'secondary' : 'ghost'} size="icon"
+                        aria-label="Circle"
+                        onClick={() => setShapeType('circle')} className="h-7 w-7">
+                        <Circle className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex items-center gap-2">
+                        <span>Circle / Ellipse</span>
+                        <Kbd>C</Kbd>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant={shapeType === 'line' ? 'secondary' : 'ghost'} size="icon"
+                        aria-label="Line"
+                        onClick={() => setShapeType('line')} className="h-7 w-7">
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex items-center gap-2">
+                        <span>Line / Arrow</span>
+                        <Kbd>L</Kbd>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </>
               )}
 
-              <Button variant={mode === 'draw' ? 'secondary' : 'ghost'} size="icon"
-                title="Freehand draw" aria-label="Freehand draw"
-                onClick={() => setMode(mode === 'draw' ? 'select' : 'draw')} className="h-9 w-9">
-                <Pencil className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'draw' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Freehand draw"
+                    onClick={() => setMode(mode === 'draw' ? 'select' : 'draw')} className="h-9 w-9">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Freehand draw</TooltipContent>
+              </Tooltip>
 
-              <Button variant={mode === 'add-signature' ? 'secondary' : 'ghost'} size="icon"
-                title="Add signature" aria-label="Add signature"
-                onClick={() => { setMode('add-signature'); setShowSigModal(true) }} className="h-9 w-9">
-                <PenLine className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mode === 'add-signature' ? 'secondary' : 'ghost'} size="icon"
+                    aria-label="Add signature"
+                    onClick={() => { setMode('add-signature'); setShowSigModal(true) }} className="h-9 w-9">
+                    <PenLine className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Add signature</TooltipContent>
+              </Tooltip>
             </aside>
 
             {/* ---- CENTER: Canvas + hints ---- */}
@@ -2304,8 +2730,8 @@ export default function PdfViewerPage() {
 
                     {/* Freehand draw live preview */}
                     {mode === 'draw' && livePoints.length >= 2 && (() => {
-                      const cw = canvasRef.current?.width ?? 1
-                      const ch = canvasRef.current?.height ?? 1
+                      const cw = canvasDimensions.width || canvasRef.current?.width || 1
+                      const ch = canvasDimensions.height || canvasRef.current?.height || 1
                       return (
                         <svg className="pointer-events-none absolute inset-0" width={cw} height={ch} style={{ overflow: 'visible' }}>
                           <polyline
@@ -2322,11 +2748,13 @@ export default function PdfViewerPage() {
 
                     {/* Annotations */}
                     {pageAnnotations.map((ann) => {
-                      const canvas = canvasRef.current
-                      const w = canvas?.width ?? 0
-                      const h = canvas?.height ?? 0
+                      const w = canvasDimensions.width || canvasRef.current?.width || 0
+                      const h = canvasDimensions.height || canvasRef.current?.height || 0
                       const isSelected = ann.id === selectedId
                       const isEditing = ann.id === editingId
+
+                      // Don't render annotations until canvas has valid dimensions
+                      if (w === 0 || h === 0) return null
 
                       if (isShape(ann)) {
                         if (ann.shape === 'line') {
@@ -2530,8 +2958,14 @@ export default function PdfViewerPage() {
                             <input
                               // biome-ignore lint/a11y/noAutofocus: intentional — just placed
                               autoFocus
+                              ref={(el) => { 
+                                if (el && !el.dataset.initialized) {
+                                  el.dataset.initialized = 'true'
+                                  setTimeout(() => { el.focus(); el.select(); }, 0)
+                                }
+                              }}
                               value={ann.text}
-                              onChange={(e) => setAnnotations((prev) => prev.map((a) => a.id === ann.id ? { ...a, text: e.target.value } as TextAnnotation : a))}
+                              onChange={(e) => { setAnnotations((prev) => prev.map((a) => a.id === ann.id ? { ...a, text: e.target.value } as TextAnnotation : a)); setPanelText(e.target.value) }}
                               onBlur={() => {
                                 if (preEditSnapshotRef.current) {
                                   pushHistory(annotationsRef.current, preEditSnapshotRef.current)
@@ -2651,8 +3085,24 @@ export default function PdfViewerPage() {
                   )}
 
                   {/* Text properties */}
-                  {!selectedIsShape && !selectedIsDraw && mode !== 'add-shape' && mode !== 'draw' && (
+                  {!selectedIsShape && !selectedIsDraw && mode !== 'add-shape' && mode !== 'draw' && selectedAnn && !isImage(selectedAnn) && (
                     <>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <label htmlFor="text-content" className="text-xs text-muted-foreground">Text</label>
+                        <input
+                          id="text-content"
+                          type="text"
+                          value={panelText}
+                          onChange={(e) => {
+                            setPanelText(e.target.value)
+                            updateSelected({ text: e.target.value })
+                          }}
+                          onBlur={(e) => commitSelectedUpdate({ text: e.target.value })}
+                          placeholder="Enter text..."
+                          className="w-28 rounded border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <label htmlFor="font-size" className="text-xs text-muted-foreground">Size</label>
                         <input id="font-size" type="number" min={6} max={96} value={newFontSize}
@@ -2688,6 +3138,56 @@ export default function PdfViewerPage() {
                         </div>
                       </div>
                     </>
+                  )}
+
+                  {/* QR/Barcode properties */}
+                  {selectedAnn && isImage(selectedAnn) && 'label' in selectedAnn && (
+                    <div className="mb-2">
+                      <label className="mb-1.5 block text-xs text-muted-foreground">
+                        {selectedAnn.label?.includes('QR') ? 'QR Code Content' : 'Barcode Content'}
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedAnn.label?.replace('QR: ', '').replace('Barcode: ', '') || ''}
+                        onChange={(e) => {
+                          const newText = e.target.value
+                          const label = selectedAnn.label?.includes('QR') ? `QR: ${newText}` : `Barcode: ${newText}`
+                          setAnnotations((prev) => prev.map((a) => a.id === selectedAnn.id ? { ...a, label } as ImageAnnotation : a))
+                        }}
+                        onBlur={() => {
+                          // Regenerate QR/barcode image
+                          const regenerateImage = async () => {
+                            if (!selectedAnn || !('label' in selectedAnn)) return
+                            const text = selectedAnn.label?.replace('QR: ', '').replace('Barcode: ', '') || ''
+                            
+                            if (selectedAnn.label?.includes('QR')) {
+                              // Regenerate QR code
+                              const QRCode = (await import('qrcode')).default
+                              const offscreen = document.createElement('canvas')
+                              await QRCode.toCanvas(offscreen, text, { width: 200, errorCorrectionLevel: 'M' })
+                              const dataUrl = offscreen.toDataURL('image/png')
+                              setAnnotations((prev) => prev.map((a) => a.id === selectedAnn.id ? { ...a, dataUrl } as ImageAnnotation : a))
+                            } else {
+                              // Regenerate barcode
+                              const JsBarcode = (await import('jsbarcode')).default
+                              const offscreen = document.createElement('canvas')
+                              JsBarcode(offscreen, text, {
+                                format: 'CODE128',
+                                width: 2,
+                                height: 80,
+                                displayValue: true,
+                                fontSize: 14,
+                              })
+                              const dataUrl = offscreen.toDataURL('image/png')
+                              setAnnotations((prev) => prev.map((a) => a.id === selectedAnn.id ? { ...a, dataUrl } as ImageAnnotation : a))
+                            }
+                          }
+                          regenerateImage().catch(() => {})
+                        }}
+                        className="w-full rounded border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder={selectedAnn.label?.includes('QR') ? 'Enter text or URL' : 'Enter barcode value'}
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -2873,5 +3373,6 @@ export default function PdfViewerPage() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   )
 }
