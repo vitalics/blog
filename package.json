@@ -10,9 +10,8 @@
     "format": "biome format --write",
     "shadcn:add": "pnpm dlx shadcn@latest add"
   },
-  "packages": {
-    "*": "*"
-  },
+  "packages": {},
+  "packageManager": "pnpm@10.11.0",
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/mdx": "^3.1.1",
