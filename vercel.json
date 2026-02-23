@@ -1,7 +1,7 @@
 {
-  "buildCommand": "ENABLE_EXPERIMENTAL_COREPACK=1 pnpm build",
+  "buildCommand": "pnpm build",
   "framework": "nextjs",
-  "installCommand": "ENABLE_EXPERIMENTAL_COREPACK=1 pnpm install",
+  "installCommand": "pnpm install",
   "headers": [
     {
       "source": "/(.*)",
