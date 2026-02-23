@@ -25,6 +25,13 @@ import { Kbd, KbdGroup } from '@/components/ui/kbd'
 const IDB_DB = 'pdf-viewer'
 const IDB_STORE = 'sessions'
 const IDB_SIG_STORE = 'signatures'
+const IDB_HISTORY_STORE = 'history'
+
+interface StoredHistory {
+  sessionId: string
+  undoStack: Annotation[][]
+  redoStack: Annotation[][]
+}
 
 interface StoredSession {
   id: string
@@ -45,14 +52,15 @@ let dbPromise: Promise<IDBDatabase> | null = null
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise
   dbPromise = new Promise((resolve, reject) => {
-    // version 3: adds 'signatures' object store
-    const req = indexedDB.open(IDB_DB, 3)
+    // version 4: adds 'history' object store for undo/redo
+    const req = indexedDB.open(IDB_DB, 4)
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result
       // drop legacy store if present
       if (db.objectStoreNames.contains('session')) db.deleteObjectStore('session')
       if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(IDB_SIG_STORE)) db.createObjectStore(IDB_SIG_STORE, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(IDB_HISTORY_STORE)) db.createObjectStore(IDB_HISTORY_STORE, { keyPath: 'sessionId' })
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => { dbPromise = null; reject(req.error) }
@@ -85,6 +93,40 @@ async function idbDelete(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite')
     tx.objectStore(IDB_STORE).delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// History IDB (undo/redo persistence)
+// ---------------------------------------------------------------------------
+
+async function saveHistory(sessionId: string, history: StoredHistory): Promise<void> {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_HISTORY_STORE, 'readwrite')
+    tx.objectStore(IDB_HISTORY_STORE).put(history)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function loadHistory(sessionId: string): Promise<StoredHistory | null> {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_HISTORY_STORE, 'readonly')
+    const req = tx.objectStore(IDB_HISTORY_STORE).get(sessionId)
+    req.onsuccess = () => resolve(req.result ?? null)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function deleteHistory(sessionId: string): Promise<void> {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_HISTORY_STORE, 'readwrite')
+    tx.objectStore(IDB_HISTORY_STORE).delete(sessionId)
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
@@ -564,6 +606,15 @@ export default function PdfViewerPage() {
     setAnnotations(next)
     setCanUndo(true)
     setCanRedo(false)
+    // Persist to IndexedDB
+    const sessionId = currentSessionIdRef.current
+    if (sessionId) {
+      saveHistory(sessionId, {
+        sessionId,
+        undoStack: undoStack.current,
+        redoStack: redoStack.current,
+      }).catch(() => {})
+    }
   }, [])
 
   const undo = useCallback(() => {
@@ -574,6 +625,15 @@ export default function PdfViewerPage() {
     setAnnotations(prev)
     setCanUndo(undoStack.current.length > 0)
     setCanRedo(true)
+    // Persist to IndexedDB
+    const sessionId = currentSessionIdRef.current
+    if (sessionId) {
+      saveHistory(sessionId, {
+        sessionId,
+        undoStack: undoStack.current,
+        redoStack: redoStack.current,
+      }).catch(() => {})
+    }
   }, [])
 
   const redo = useCallback(() => {
@@ -584,6 +644,15 @@ export default function PdfViewerPage() {
     setAnnotations(next)
     setCanUndo(true)
     setCanRedo(redoStack.current.length > 0)
+    // Persist to IndexedDB
+    const sessionId = currentSessionIdRef.current
+    if (sessionId) {
+      saveHistory(sessionId, {
+        sessionId,
+        undoStack: undoStack.current,
+        redoStack: redoStack.current,
+      }).catch(() => {})
+    }
   }, [])
 
   // Undo/redo keyboard shortcuts are handled in the consolidated keyboard handler below
@@ -594,6 +663,11 @@ export default function PdfViewerPage() {
     redoStack.current = []
     setCanUndo(false)
     setCanRedo(false)
+    // Clear history from IndexedDB
+    const sessionId = currentSessionIdRef.current
+    if (sessionId) {
+      deleteHistory(sessionId).catch(() => {})
+    }
   }, [])
 
   // ---------------------------------------------------------------------------
@@ -717,13 +791,23 @@ export default function PdfViewerPage() {
       const file = new File([session.fileBytes], session.fileName, { type: 'application/pdf' })
       setPdfFile(file)
       await loadPdf(file, session.annotations, session.currentPage, session.scale, session.id)
+      
+      // Load history from IndexedDB
+      const history = await loadHistory(session.id)
+      if (history) {
+        undoStack.current = history.undoStack
+        redoStack.current = history.redoStack
+        setCanUndo(history.undoStack.length > 0)
+        setCanRedo(history.redoStack.length > 0)
+      }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to open session.')
+      console.error('Failed to open session:', err)
     }
   }
 
   const handleDeleteSession = async (id: string) => {
     await idbDelete(id).catch(() => {})
+    await deleteHistory(id).catch(() => {})
     setSavedSessions((prev) => prev.filter((s) => s.id !== id))
   }
 
