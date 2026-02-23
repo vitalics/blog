@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check, ArrowLeft, Share2 } from 'lucide-react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { ColorPicker } from '@/components/ui/color-picker'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -667,17 +668,10 @@ export default function ImageConverterPage() {
                   Transparent
                 </label>
                 {!bgTransparent && (
-                  <label className="flex cursor-pointer items-center gap-2 text-sm" aria-label="Pick background color">
-                    <span className="h-6 w-6 rounded border" style={{ background: bgColor }} aria-hidden="true" />
-                    <input
-                      type="color"
-                      value={bgColor}
-                      onChange={(e) => setBgColor(e.target.value)}
-                      className="sr-only"
-                      aria-label="Background color"
-                    />
+                  <div className="flex items-center gap-2">
+                    <ColorPicker value={bgColor} onChange={setBgColor} />
                     <span className="font-mono text-xs text-muted-foreground">{bgColor}</span>
-                  </label>
+                  </div>
                 )}
                 {!bgTransparent && targetFormat === 'jpeg' && (
                   <p className="text-xs text-amber-600 dark:text-amber-400" role="note">
