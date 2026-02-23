@@ -41,6 +41,7 @@ import {
   ChevronsUpDown,
   Menu,
   SlidersHorizontal,
+  Image,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ColorPicker } from "@/components/ui/color-picker";
@@ -260,6 +261,87 @@ const OCR_LANGUAGES = [
   { value: "kor", label: "Korean" },
 ] as const;
 
+// ---------------------------------------------------------------------------
+// Standard fonts
+// ---------------------------------------------------------------------------
+
+const STANDARD_FONTS = [
+  { value: "helvetica", label: "Helvetica" },
+  { value: "helvetica-bold", label: "Helvetica Bold" },
+  { value: "helvetica-oblique", label: "Helvetica Italic" },
+  { value: "helvetica-bold-oblique", label: "Helvetica Bold Italic" },
+  { value: "times-roman", label: "Times New Roman" },
+  { value: "times-bold", label: "Times New Roman Bold" },
+  { value: "times-italic", label: "Times New Roman Italic" },
+  { value: "times-bold-italic", label: "Times New Roman Bold Italic" },
+  { value: "courier", label: "Courier" },
+  { value: "courier-bold", label: "Courier Bold" },
+  { value: "courier-oblique", label: "Courier Italic" },
+  { value: "courier-bold-oblique", label: "Courier Bold Italic" },
+  { value: "symbol", label: "Symbol" },
+  { value: "zapfdingbats", label: "Zapf Dingbats" },
+] as const;
+
+// Searchable combobox for font selection
+function FontSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = STANDARD_FONTS.find((f) => f.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          className={[
+            "flex h-8 w-full items-center justify-between gap-1 rounded border bg-background px-2 text-sm font-normal",
+            "hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring",
+          ].join(" ")}
+        >
+          <span className="truncate">{selected?.label ?? "Font"}</span>
+          <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search font…" className="h-8 text-sm" />
+          <CommandList>
+            <CommandEmpty>No font found.</CommandEmpty>
+            <CommandGroup>
+              {STANDARD_FONTS.map((f) => (
+                <CommandItem
+                  key={f.value}
+                  value={f.label}
+                  onSelect={() => {
+                    onChange(f.value);
+                    setOpen(false);
+                  }}
+                  className="text-sm"
+                >
+                  <Check
+                    className={[
+                      "mr-2 h-3.5 w-3.5",
+                      value === f.value ? "opacity-100" : "opacity-0",
+                    ].join(" ")}
+                  />
+                  {f.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Helper to detect macOS for keyboard shortcut display
 const isMac =
   typeof navigator !== "undefined" &&
@@ -344,7 +426,8 @@ type EditorMode =
   | "add-barcode"
   | "add-shape"
   | "draw"
-  | "add-signature";
+  | "add-signature"
+  | "add-image";
 
 interface TextAnnotation {
   id: string;
@@ -354,6 +437,7 @@ interface TextAnnotation {
   yRatio: number;
   text: string;
   fontSize: number;
+  fontFamily: string;
   color: string;
   bgColor: string;
 }
@@ -919,12 +1003,96 @@ export default function PdfViewerPage() {
   // File input / drag-drop
   // ---------------------------------------------------------------------------
 
-  const handleFile = useCallback(
-    (file: File) => {
-      setPdfFile(file);
-      loadPdf(file);
+  // Convert image to PDF
+  const convertImageToPdf = useCallback(
+    async (file: File): Promise<File> => {
+      const { PDFDocument } = await import("pdf-lib");
+
+      // Read the image file
+      const arrayBuffer = await file.arrayBuffer();
+      // biome-ignore lint/suspicious/noExplicitAny: pdf-lib types loaded dynamically
+      let image: any;
+      let width: number;
+      let height: number;
+
+      // Create an image element to get dimensions
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const blob = new Blob([arrayBuffer]);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read image"));
+        reader.readAsDataURL(blob);
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const imgElement = new window.Image();
+      await new Promise<void>((resolve, reject) => {
+        imgElement.onload = () => resolve();
+        imgElement.onerror = () => reject(new Error("Failed to load image"));
+        imgElement.src = dataUrl;
+      });
+
+      width = imgElement.naturalWidth;
+      height = imgElement.naturalHeight;
+
+      // Create PDF with image dimensions (scaled down if too large)
+      const maxDimension = 2000;
+      let scale = 1;
+      if (width > maxDimension || height > maxDimension) {
+        scale = maxDimension / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([width, height]);
+
+      // Embed the image based on type
+      const fileType = file.type.toLowerCase();
+      if (fileType === "image/png" || fileType === "image/webp") {
+        image = await pdfDoc.embedPng(arrayBuffer);
+      } else if (fileType === "image/jpeg" || fileType === "image/jpg") {
+        image = await pdfDoc.embedJpg(arrayBuffer);
+      }
+
+      if (image) {
+        page.drawImage(image, {
+          x: 0,
+          y: 0,
+          width,
+          height,
+        });
+      }
+
+      const bytes = await pdfDoc.save();
+      const name = file.name.replace(/\.[^/.]+$/, "") + ".pdf";
+      return new File([bytes.buffer as ArrayBuffer], name, {
+        type: "application/pdf",
+      });
     },
-    [loadPdf],
+    [],
+  );
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      const fileType = file.type.toLowerCase();
+      const isImage =
+        fileType === "image/png" ||
+        fileType === "image/jpeg" ||
+        fileType === "image/jpg" ||
+        fileType === "image/webp";
+
+      if (isImage) {
+        // Convert image to PDF first
+        const pdfFile = await convertImageToPdf(file);
+        setPdfFile(pdfFile);
+        loadPdf(pdfFile);
+      } else {
+        setPdfFile(file);
+        loadPdf(file);
+      }
+    },
+    [loadPdf, convertImageToPdf],
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1233,6 +1401,7 @@ export default function PdfViewerPage() {
         ...ratio,
         text: "Text",
         fontSize: newFontSize,
+        fontFamily: "helvetica",
         color: newColor,
         bgColor: newBgColor,
       };
@@ -1451,6 +1620,7 @@ export default function PdfViewerPage() {
         yRatio,
         text,
         fontSize: newFontSize,
+        fontFamily: "helvetica",
         color: newColor,
         bgColor: newBgColor,
       };
@@ -1749,6 +1919,7 @@ export default function PdfViewerPage() {
       yRatio: 0.5,
       text: "Text",
       fontSize: newFontSize,
+      fontFamily: "helvetica",
       color: newColor,
       bgColor: newBgColor,
     };
@@ -1757,6 +1928,150 @@ export default function PdfViewerPage() {
     // Delay setting editing mode to prevent keypress from being typed
     setTimeout(() => setEditingId(annotation.id), 10);
   }, [currentPage, newFontSize, newColor, newBgColor, pushHistory]);
+
+  // ---------------------------------------------------------------------------
+  // Add image from file upload
+  // ---------------------------------------------------------------------------
+
+  const addImageFromFile = useCallback(
+    async (file: File) => {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+
+        // Get image dimensions
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const blob = new Blob([arrayBuffer]);
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Failed to read image"));
+          reader.readAsDataURL(blob);
+        });
+
+        const imgElement = new window.Image();
+        await new Promise<void>((resolve, reject) => {
+          imgElement.onload = () => resolve();
+          imgElement.onerror = () => reject(new Error("Failed to load image"));
+          imgElement.src = dataUrl;
+        });
+
+        // Calculate aspect ratio for the annotation
+        const canvas = canvasRef.current;
+        const canvasAspect = (canvas?.width ?? 600) / (canvas?.height ?? 800);
+        const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
+
+        // Default width ratio
+        const wRatio = 0.4;
+        const hRatio = wRatio * (imgAspect / canvasAspect);
+
+        const annotation: ImageAnnotation = {
+          id: uid(),
+          page: currentPage,
+          xRatio: 0.1,
+          yRatio: 0.1,
+          wRatio,
+          hRatio,
+          dataUrl,
+          label: file.name,
+        };
+        pushHistory([...annotationsRef.current, annotation]);
+        setSelectedId(annotation.id);
+        setMode("select");
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : "Failed to add image.");
+      }
+    },
+    [currentPage, pushHistory],
+  );
+
+  const handleImageUpload = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/jpg,image/webp";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        await addImageFromFile(file);
+      }
+    };
+    input.click();
+  }, [addImageFromFile]);
+
+  // Replace existing image with new one
+  const replaceImage = useCallback(
+    async (file: File, annotationId: string) => {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+
+        // Get image dimensions
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const blob = new Blob([arrayBuffer]);
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Failed to read image"));
+          reader.readAsDataURL(blob);
+        });
+
+        const imgElement = new window.Image();
+        await new Promise<void>((resolve, reject) => {
+          imgElement.onload = () => resolve();
+          imgElement.onerror = () => reject(new Error("Failed to load image"));
+          imgElement.src = dataUrl;
+        });
+
+        // Get the existing annotation to preserve position
+        const existingAnn = annotationsRef.current.find(
+          (a) => a.id === annotationId,
+        );
+        if (!existingAnn || !isImage(existingAnn)) return;
+
+        const existingImg = existingAnn as ImageAnnotation;
+
+        // Calculate new aspect ratio
+        const canvas = canvasRef.current;
+        const canvasAspect = (canvas?.width ?? 600) / (canvas?.height ?? 800);
+        const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
+
+        // Keep the same width, calculate new height
+        const wRatio = existingImg.wRatio;
+        const hRatio = wRatio * (imgAspect / canvasAspect);
+
+        setAnnotations((prev) =>
+          prev.map((a) =>
+            a.id === annotationId
+              ? ({
+                  ...a,
+                  dataUrl,
+                  label: file.name,
+                  wRatio,
+                  hRatio,
+                } as ImageAnnotation)
+              : a,
+          ),
+        );
+      } catch (err) {
+        setErrorMsg(
+          err instanceof Error ? err.message : "Failed to replace image.",
+        );
+      }
+    },
+    [],
+  );
+
+  const handleImageReplace = useCallback(
+    (annotationId: string) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/png,image/jpeg,image/jpg,image/webp";
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          await replaceImage(file, annotationId);
+        }
+      };
+      input.click();
+    },
+    [replaceImage],
+  );
 
   // Consolidated keyboard shortcuts handler
   useEffect(() => {
@@ -1883,17 +2198,78 @@ export default function PdfViewerPage() {
         return;
       }
 
-      // + or = key - Zoom in
-      if ((e.key === "+" || e.key === "=") && !mod && pdfFile) {
+      // I key - Add image from file
+      if (e.key === "i" && !mod && editingId === null && pdfFile) {
         e.preventDefault();
-        zoomIn();
+        handleImageUpload();
         return;
       }
 
-      // - key - Zoom out
+      // + or = key - Increase size of selected element OR zoom in
+      if ((e.key === "+" || e.key === "=") && !mod && pdfFile) {
+        e.preventDefault();
+        if (selectedId && !editingId) {
+          // Increase size of selected element (images, shapes, signatures, text)
+          const ann = annotationsRef.current.find((a) => a.id === selectedId);
+          if (ann && isText(ann)) {
+            // Increase font size for text
+            const a = ann as TextAnnotation;
+            const newSize = Math.min(200, (a.fontSize || 16) + 2);
+            setAnnotations((prev) =>
+              prev.map((item) =>
+                item.id === selectedId
+                  ? { ...item, fontSize: newSize }
+                  : item,
+              ),
+            );
+          } else if (ann && (isImage(ann) || isShape(ann) || isSignature(ann))) {
+            const a = ann as ImageAnnotation | ShapeAnnotation | SignatureAnnotation;
+            const resizeAmount = 0.05;
+            setAnnotations((prev) =>
+              prev.map((item) =>
+                item.id === selectedId
+                  ? { ...item, wRatio: (a.wRatio || 0) + resizeAmount, hRatio: (a.hRatio || 0) + resizeAmount }
+                  : item,
+              ),
+            );
+          }
+        } else {
+          zoomIn();
+        }
+        return;
+      }
+
+      // - key - Decrease size of selected element OR zoom out
       if (e.key === "-" && !mod && pdfFile) {
         e.preventDefault();
-        zoomOut();
+        if (selectedId && !editingId) {
+          // Decrease size of selected element (images, shapes, signatures, text)
+          const ann = annotationsRef.current.find((a) => a.id === selectedId);
+          if (ann && isText(ann)) {
+            // Decrease font size for text
+            const a = ann as TextAnnotation;
+            const newSize = Math.max(6, (a.fontSize || 16) - 2);
+            setAnnotations((prev) =>
+              prev.map((item) =>
+                item.id === selectedId
+                  ? { ...item, fontSize: newSize }
+                  : item,
+              ),
+            );
+          } else if (ann && (isImage(ann) || isShape(ann) || isSignature(ann))) {
+            const a = ann as ImageAnnotation | ShapeAnnotation | SignatureAnnotation;
+            const resizeAmount = 0.05;
+            setAnnotations((prev) =>
+              prev.map((item) =>
+                item.id === selectedId
+                  ? { ...item, wRatio: Math.max(0.03, (a.wRatio || 0) - resizeAmount), hRatio: Math.max(0.03, (a.hRatio || 0) - resizeAmount) }
+                  : item,
+              ),
+            );
+          }
+        } else {
+          zoomOut();
+        }
         return;
       }
 
@@ -2028,6 +2404,7 @@ export default function PdfViewerPage() {
     goToNext,
     goToPrev,
     shapeType,
+    handleImageUpload,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2112,6 +2489,8 @@ export default function PdfViewerPage() {
     }
   };
 
+
+
   // ---------------------------------------------------------------------------
   // Export / Share
   // ---------------------------------------------------------------------------
@@ -2155,7 +2534,30 @@ export default function PdfViewerPage() {
     }
 
     const pdfDoc = await PDFDocument.load(pdfBytesRef.current!);
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    // Font embedding helper
+    // biome-ignore lint/suspicious/noExplicitAny: pdf-lib types
+    const getFont = async (fontFamily: string) => {
+      const fontMap: Record<string, any> = {
+        "helvetica": StandardFonts.Helvetica,
+        "helvetica-bold": StandardFonts.HelveticaBold,
+        "helvetica-oblique": StandardFonts.HelveticaOblique,
+        "helvetica-bold-oblique": StandardFonts.HelveticaBoldOblique,
+        "times-roman": StandardFonts.TimesRoman,
+        "times-bold": StandardFonts.TimesRomanBold,
+        "times-italic": StandardFonts.TimesRomanItalic,
+        "times-bold-italic": StandardFonts.TimesRomanBoldItalic,
+        "courier": StandardFonts.Courier,
+        "courier-bold": StandardFonts.CourierBold,
+        "courier-oblique": StandardFonts.CourierOblique,
+        "courier-bold-oblique": StandardFonts.CourierBoldOblique,
+        "symbol": StandardFonts.Symbol,
+        "zapfdingbats": StandardFonts.ZapfDingbats,
+      };
+      const sf = fontMap[fontFamily] ?? StandardFonts.Helvetica;
+      return pdfDoc.embedFont(sf);
+    };
+
     const pages = pdfDoc.getPages();
 
     for (const ann of annotationsRef.current) {
@@ -2273,12 +2675,13 @@ export default function PdfViewerPage() {
           borderWidth: ann.strokeWidth,
           borderLineCap: LineCapStyle.Round,
         });
-      } else {
+      } else if (isText(ann)) {
+        const textFont = await getFont(ann.fontFamily ?? "helvetica");
         const x = ann.xRatio * pw;
         const y = ph - ann.yRatio * ph - ann.fontSize;
         const { r, g, b } = parseHexToRgb01(ann.color);
         if (ann.bgColor !== "none") {
-          const tw = font.widthOfTextAtSize(ann.text, ann.fontSize);
+          const tw = textFont.widthOfTextAtSize(ann.text, ann.fontSize);
           const { r: br, g: bg, b: bb } = parseHexToRgb01(ann.bgColor);
           pdfPage.drawRectangle({
             x,
@@ -2292,7 +2695,7 @@ export default function PdfViewerPage() {
           x,
           y,
           size: ann.fontSize,
-          font,
+          font: textFont,
           color: rgb(r, g, b),
         });
       }
@@ -2686,9 +3089,9 @@ export default function PdfViewerPage() {
                 aria-hidden="true"
               />
               <div>
-                <p className="font-medium">Drop a PDF here</p>
+                <p className="font-medium">Drop a PDF or image here</p>
                 <p className="text-sm text-muted-foreground">
-                  or click to browse
+                  or click to browse (PDF, PNG, JPG, WEBP)
                 </p>
               </div>
               {status === "error" && errorMsg && (
@@ -3547,6 +3950,15 @@ export default function PdfViewerPage() {
                       >
                         <PenLine className="h-4 w-4" /> Signature
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start gap-2"
+                        onClick={handleImageUpload}
+                        title="Add image (I)"
+                      >
+                        <Image className="h-4 w-4" /> Image
+                      </Button>
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -3834,6 +4246,26 @@ export default function PdfViewerPage() {
                     <div className="flex items-center gap-2">
                       <span>Add signature</span>
                       <Kbd>S</Kbd>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Add image"
+                      onClick={handleImageUpload}
+                      className="h-9 w-9"
+                    >
+                      <Image className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <div className="flex items-center gap-2">
+                      <span>Add image</span>
+                      <Kbd>I</Kbd>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -4616,6 +5048,7 @@ export default function PdfViewerPage() {
                               top,
                               position: "absolute",
                               fontSize: ann.fontSize * scale,
+                              fontFamily: ann.fontFamily ?? "Helvetica, Arial, sans-serif",
                               color: ann.color,
                               lineHeight: 1,
                               backgroundColor:
@@ -4952,6 +5385,21 @@ export default function PdfViewerPage() {
                           </div>
 
                           <div className="mb-2 flex items-center justify-between gap-2">
+                            <label className="text-xs text-muted-foreground">
+                              Font
+                            </label>
+                            <div className="w-28">
+                              <FontSelect
+                                value={(selectedAnn as TextAnnotation)?.fontFamily ?? "helvetica"}
+                                onChange={(fontFamily) => {
+                                  updateSelected({ fontFamily });
+                                  commitSelectedUpdate({ fontFamily });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mb-2 flex items-center justify-between gap-2">
                             <label
                               htmlFor="font-size"
                               className="text-xs text-muted-foreground"
@@ -5039,10 +5487,15 @@ export default function PdfViewerPage() {
                         </>
                       )}
 
-                    {/* QR/Barcode properties */}
+                    {/* QR/Barcode properties - only show for generated codes, not uploaded images */}
                     {selectedAnn &&
                       isImage(selectedAnn) &&
-                      "label" in selectedAnn && (
+                      "label" in selectedAnn &&
+                      (selectedAnn.label?.includes("QR") ||
+                        selectedAnn.label?.includes("Barcode") ||
+                        selectedAnn.label?.includes("EAN") ||
+                        selectedAnn.label?.includes("UPC") ||
+                        selectedAnn.label?.includes("CODE")) && (
                         <div className="mb-2">
                           <label className="mb-1.5 block text-xs text-muted-foreground">
                             {selectedAnn.label?.includes("QR")
@@ -5131,6 +5584,34 @@ export default function PdfViewerPage() {
                                 : "Enter barcode value"
                             }
                           />
+                        </div>
+                      )}
+
+                    {/* Image source - show for uploaded images (not QR/barcodes) */}
+                    {selectedAnn &&
+                      isImage(selectedAnn) &&
+                      "label" in selectedAnn &&
+                      !selectedAnn.label?.includes("QR") &&
+                      !selectedAnn.label?.includes("Barcode") &&
+                      !selectedAnn.label?.includes("EAN") &&
+                      !selectedAnn.label?.includes("UPC") && (
+                        <div className="mb-2">
+                          <label className="mb-1.5 block text-xs text-muted-foreground">
+                            Source
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <span className="flex-1 truncate text-xs text-foreground">
+                              {selectedAnn.label}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleImageReplace(selectedAnn.id)}
+                              className="shrink-0 text-xs"
+                            >
+                              Replace
+                            </Button>
+                          </div>
                         </div>
                       )}
                   </div>
@@ -5248,7 +5729,7 @@ export default function PdfViewerPage() {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,application/pdf,image/png,image/jpeg,image/jpg,image/webp"
           className="hidden"
           onChange={handleInputChange}
         />
