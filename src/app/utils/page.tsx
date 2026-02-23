@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ImageIcon, Archive } from 'lucide-react'
+import { ImageIcon, Archive, Terminal } from 'lucide-react'
 
 export const metadata = {
   title: 'Utils',
@@ -20,6 +20,13 @@ const TOOLS = [
     name: 'Archive Builder',
     description: 'Pack files into ZIP, TAR.GZ, or GZip archives in your browser. Includes the extract command for your OS.',
     tags: ['zip', 'tar', 'gzip', 'archive', 'files'],
+  },
+  {
+    href: '/utils/ssh',
+    icon: Terminal,
+    name: 'SSH Client',
+    description: 'Connect to remote machines via SSH directly in your browser. Save sessions for quick reconnects.',
+    tags: ['ssh', 'terminal', 'remote', 'shell'],
   },
 ]
 
