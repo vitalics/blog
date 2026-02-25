@@ -452,10 +452,10 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
       elements, files, mimeType: "image/png",
       appState: { exportWithDarkMode: resolvedTheme === "dark" },
     });
-    const name = `${sessionsRef.current.find((s) => s.id === currentIdRef.current)?.name ?? "drawing"}.png`;
-    const file = new File([blob], name, { type: "image/png" });
+    const sessionName = sessionsRef.current.find((s) => s.id === currentIdRef.current)?.name ?? "drawing";
+    const file = new File([blob], `${sessionName}.png`, { type: "image/png" });
     if (navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: name });
+      await navigator.share({ files: [file] });
     }
   }, [excalidrawAPI, resolvedTheme]);
 
