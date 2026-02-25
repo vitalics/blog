@@ -16,9 +16,19 @@ import {
   X,
   PenLine,
   Save,
+  MoreHorizontal,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -140,6 +150,7 @@ function newSession(name = "Untitled"): Session {
 // ---------------------------------------------------------------------------
 
 export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: string }) {
+  const { resolvedTheme } = useTheme();
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -428,6 +439,27 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
   }, []);
 
   // ---------------------------------------------------------------------------
+  // Web Share (PNG)
+  // ---------------------------------------------------------------------------
+  const canShare = typeof navigator !== "undefined" && !!navigator.share && !!navigator.canShare;
+
+  const handleShare = useCallback(async () => {
+    if (!excalidrawAPI) return;
+    const elements = excalidrawAPI.getSceneElements();
+    const files = excalidrawAPI.getFiles();
+    if (elements.length === 0) return;
+    const blob = await exportToBlob({
+      elements, files, mimeType: "image/png",
+      appState: { exportWithDarkMode: resolvedTheme === "dark" },
+    });
+    const name = `${sessionsRef.current.find((s) => s.id === currentIdRef.current)?.name ?? "drawing"}.png`;
+    const file = new File([blob], name, { type: "image/png" });
+    if (navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: name });
+    }
+  }, [excalidrawAPI, resolvedTheme]);
+
+  // ---------------------------------------------------------------------------
   // Clear current session canvas
   // ---------------------------------------------------------------------------
   const handleClear = useCallback(() => {
@@ -557,9 +589,9 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
         </Link>
 
         <PenLine className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <span className="font-bold">Excalidraw</span>
+        <span className="hidden sm:inline font-bold">Excalidraw</span>
 
-        <div className="mx-2 h-4 w-px bg-border" />
+        <div className="hidden sm:block mx-2 h-4 w-px bg-border" />
 
         {/* Session name + picker */}
         <div className="relative flex items-center gap-1" ref={dropdownRef}>
@@ -654,57 +686,119 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
           )}
         </div>
 
-        {/* Rename current session (pencil shortcut) */}
+        {/* Rename current session (pencil shortcut) — desktop only */}
         {!editingName && (
           <button
             type="button"
             onClick={() => setEditingName(true)}
-            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="hidden sm:flex rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             aria-label="Rename session"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
         )}
 
-        {/* Right-side actions */}
+        {/* Right-side actions — full toolbar on md+, overflow menu on mobile */}
         <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={createSession} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            New
-          </Button>
-
-          <div className="mx-1 h-4 w-px bg-border" />
-
-          <Button variant="ghost" size="sm" onClick={handleSave} className="gap-1.5">
-            <Save className="h-4 w-4" />
-            Save
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
           <input ref={fileInputRef} type="file" accept=".excalidraw,application/json" className="hidden" onChange={handleImport} />
 
-          <Button variant="ghost" size="sm" onClick={handleExportPng} className="gap-1.5">
-            <Download className="h-4 w-4" />
-            PNG
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleExportSvg} className="gap-1.5">
-            <Download className="h-4 w-4" />
-            SVG
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleExportJson} className="gap-1.5">
-            <Download className="h-4 w-4" />
-            .excalidraw
-          </Button>
+          {/* Desktop toolbar */}
+          <div className="hidden md:flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={createSession} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              New
+            </Button>
 
-          <div className="mx-1 h-4 w-px bg-border" />
+            <div className="mx-1 h-4 w-px bg-border" />
 
-          <Button variant="ghost" size="sm" onClick={handleClear} className="gap-1.5 text-destructive hover:text-destructive">
-            <Trash2 className="h-4 w-4" />
-            Clear
-          </Button>
+            <Button variant="ghost" size="sm" onClick={handleSave} className="gap-1.5">
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
+              <Upload className="h-4 w-4" />
+              Import
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <Download className="h-4 w-4" />
+                  Export
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPng}>PNG</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportSvg}>SVG</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportJson}>.excalidraw</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {canShare && (
+              <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
+                <Share2 className="h-4 w-4" />
+                Share
+              </Button>
+            )}
+
+            <div className="mx-1 h-4 w-px bg-border" />
+
+            <Button variant="ghost" size="sm" onClick={handleClear} className="gap-1.5 text-destructive hover:text-destructive">
+              <Trash2 className="h-4 w-4" />
+              Clear
+            </Button>
+          </div>
+
+          {/* Mobile overflow menu */}
+          <div className="flex md:hidden items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={handleSave} aria-label="Save">
+              <Save className="h-4 w-4" />
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={createSession}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New session
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPng}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PNG
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportSvg}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export SVG
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportJson}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export .excalidraw
+                </DropdownMenuItem>
+                {canShare && (
+                  <DropdownMenuItem onClick={handleShare}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share as PNG
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleClear} className="text-destructive focus:text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear canvas
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -714,6 +808,7 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
       <div className="min-h-0 flex-1">
         <Excalidraw
           key={currentId}
+          theme={resolvedTheme}
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           onChange={handleChange}
           // biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
