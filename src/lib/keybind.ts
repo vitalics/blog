@@ -23,7 +23,7 @@ interface KeybindHandle {
 export class KeybindManager implements Disposable {
   private handles = new Map<string, KeybindHandle[]>();
   private enabled = true;
-  private boundHandler: (e: KeyboardEvent) => void;
+  private boundHandler: EventListener;
   private capture: boolean;
 
   constructor(
@@ -31,7 +31,7 @@ export class KeybindManager implements Disposable {
     { capture = false }: { capture?: boolean } = {},
   ) {
     this.capture = capture;
-    this.boundHandler = this.handleKeydown.bind(this);
+    this.boundHandler = this.handleKeydown.bind(this) as EventListener;
     this.parent.addEventListener("keydown", this.boundHandler, { capture });
   }
 
