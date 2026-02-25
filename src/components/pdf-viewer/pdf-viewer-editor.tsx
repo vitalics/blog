@@ -471,7 +471,7 @@ export function PdfViewerEditor({
                       key={ann.id}
                       data-ann-id={ann.id}
                       className="absolute inset-0 overflow-visible"
-                      style={{ width: w, height: h }}
+                      style={{ width: w, height: h, pointerEvents: "none" }}
                     >
                       <defs>
                         <marker
@@ -675,7 +675,7 @@ export function PdfViewerEditor({
                       width: svgW,
                       height: svgH,
                       overflow: "visible",
-                      cursor: "move",
+                      pointerEvents: "none",
                     }}
                     data-ann-id={ann.id}
                     className={
@@ -683,12 +683,6 @@ export function PdfViewerEditor({
                         ? "outline outline-2 outline-offset-2 outline-primary rounded"
                         : ""
                     }
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      onAnnotationPointerDown(e, ann.id);
-                    }}
-                    onPointerMove={onAnnotationPointerMove}
-                    onPointerUp={onAnnotationPointerUp}
                   >
                     <polyline
                       points={pts}
@@ -697,6 +691,7 @@ export function PdfViewerEditor({
                       strokeWidth={ann.strokeWidth}
                       strokeLinejoin="round"
                       strokeLinecap="round"
+                      style={{ pointerEvents: "none" }}
                     />
                     {/* Wide transparent hit area so thin lines stay clickable */}
                     <polyline
@@ -704,6 +699,19 @@ export function PdfViewerEditor({
                       fill="none"
                       stroke="transparent"
                       strokeWidth={Math.max(ann.strokeWidth, 14)}
+                      style={{ pointerEvents: "stroke", cursor: "move" }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        onAnnotationPointerDown(e, ann.id);
+                      }}
+                      onPointerMove={(e) => {
+                        e.stopPropagation();
+                        onAnnotationPointerMove(e);
+                      }}
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                        onAnnotationPointerUp();
+                      }}
                     />
                   </svg>
                 );

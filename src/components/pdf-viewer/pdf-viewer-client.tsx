@@ -343,14 +343,6 @@ export default function PdfViewerPage() {
   // Stores the last computed drag position so pointerUp can commit without setAnnotations during move
   const dragLiveRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const dragStartedRef = useRef(false);
-  const dragGhostRef = useRef<HTMLElement | null>(null);
-  // Stable <style> element for imperatively hiding the dragged annotation — lives outside React
-  const dragStyleRef = useRef<HTMLStyleElement | null>(null);
-  if (!dragStyleRef.current) {
-    const el = document.createElement("style");
-    document.head.appendChild(el);
-    dragStyleRef.current = el;
-  }
 
   const preResizeSnapshotRef = useRef<Annotation[] | null>(null);
   const preEditSnapshotRef = useRef<Annotation[] | null>(null);
@@ -654,11 +646,6 @@ export default function PdfViewerPage() {
       }
     };
   }, [currentPage, scale, status]);
-
-  useEffect(() => {
-    const el = dragStyleRef.current;
-    return () => { el?.remove(); };
-  }, []);
 
   // ---------------------------------------------------------------------------
   // File input / drag-drop
@@ -1014,6 +1001,7 @@ export default function PdfViewerPage() {
   };
 
   const handleOverlayPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    console.log("[overlay pointerdown] target === overlay:", e.target === overlayRef.current, "mode:", mode);
     // Only handle if clicking the overlay itself (not an annotation child)
     if (e.target !== overlayRef.current) return;
 
@@ -1377,6 +1365,7 @@ export default function PdfViewerPage() {
   const handleAnnotationPointerDown = (e: React.PointerEvent, id: string) => {
     e.stopPropagation();
     if (editingId === id) return;
+    console.log("[ann pointerdown]", id, "annotations count:", annotations.length);
     setSelectedId(id);
     const ann = annotations.find((a) => a.id === id);
     if (!ann) return;
@@ -1446,35 +1435,34 @@ export default function PdfViewerPage() {
       // Only start visual drag after crossing a 4px threshold
       if (!dragStartedRef.current && Math.abs(pxDx) + Math.abs(pxDy) > 4) {
         dragStartedRef.current = true;
-        // Hide original via CSS (immune to React re-renders)
-        if (dragStyleRef.current) {
-          dragStyleRef.current.textContent = `[data-ann-id="${drag.id}"] { visibility: hidden !important; }`;
-        }
-        // Create a clone that we move imperatively as the ghost
-        const original = overlayRef.current?.querySelector(`[data-ann-id="${drag.id}"]`) as HTMLElement | null;
-        if (original && overlayRef.current) {
-          const ghost = original.cloneNode(true) as HTMLElement;
-          ghost.style.visibility = "visible";
-          ghost.style.opacity = "0.6";
-          ghost.style.pointerEvents = "none";
-          ghost.removeAttribute("data-ann-id"); // so the CSS rule doesn't hide it
-          overlayRef.current.appendChild(ghost);
-          dragGhostRef.current = ghost;
-        }
       }
 
-      // Move the ghost
-      if (dragGhostRef.current) {
-        dragGhostRef.current.style.transform = `translate(${pxDx}px, ${pxDy}px)`;
+      // Move the real element imperatively — no ghost, no clone
+      if (dragStartedRef.current) {
+        const el = overlayRef.current?.querySelector(`[data-ann-id="${drag.id}"]`) as HTMLElement | null;
+        if (el) {
+          el.style.transform = `translate(${pxDx}px, ${pxDy}px)`;
+          el.style.opacity = "0.6";
+        }
       }
     });
   };
 
   const handleAnnotationPointerUp = () => {
     const drag = dragRef.current;
-    if (drag && dragStartedRef.current) {
+    console.log("[ann pointerup]", drag?.id ?? "no drag", "dragStarted:", dragStartedRef.current);
+    if (!drag) return; // already handled (double-call guard)
+
+    if (dragStartedRef.current) {
       const { dx, dy } = dragLiveRef.current;
       const snapshot = preDragSnapshotRef.current;
+
+      // Clear the imperative transform before React commits the new position
+      const el = overlayRef.current?.querySelector(`[data-ann-id="${drag.id}"]`) as HTMLElement | null;
+      if (el) {
+        el.style.transform = "";
+        el.style.opacity = "";
+      }
 
       const next = annotationsRef.current.map((a) => {
         if (a.id !== drag.id) return a;
@@ -1509,15 +1497,9 @@ export default function PdfViewerPage() {
       });
 
       pushHistory(next, snapshot ?? undefined);
-      // Remove ghost and clear CSS hide rule after React paints the final position
-      const ghost = dragGhostRef.current;
-      requestAnimationFrame(() => {
-        ghost?.remove();
-        if (dragStyleRef.current) dragStyleRef.current.textContent = "";
-      });
     }
+
     dragRef.current = null;
-    dragGhostRef.current = null;
     preDragSnapshotRef.current = null;
     dragAxisLockRef.current = null;
     dragLiveRef.current = { dx: 0, dy: 0 };
