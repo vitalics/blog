@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Archive, Upload, Download, X, Copy, Check, FolderOpen, List, GitBranch, ArrowLeft, Share2 } from 'lucide-react'
+import { Archive, Upload, Download, X, Copy, Check, FolderOpen, List, GitBranch, Share2 } from 'lucide-react'
+import { UtilPageShell } from '@/components/util-page-shell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -298,8 +298,6 @@ function RenderTree({ nodes }: { nodes: TreeNode[] }) {
 // ---------------------------------------------------------------------------
 
 export default function ArchiveBuilderPage() {
-  const router = useRouter()
-
   const [files, setFiles] = useState<FileEntry[]>([])
   const [format, setFormat] = useState<ArchiveFormat>('zip')
   const [archiveName, setArchiveName] = useState('archive.zip')
@@ -490,21 +488,11 @@ export default function ArchiveBuilderPage() {
 
   return (
     <TooltipProvider>
-      <div className="mx-auto max-w-3xl px-4 py-12">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="mb-2 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Archive className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-            <h1 className="text-4xl font-bold">Archive Builder</h1>
-          </div>
-          <p className="text-muted-foreground">
-            Pack files into a compressed archive entirely in your browser. Nothing is uploaded.
-          </p>
-        </div>
-
+      <UtilPageShell
+        icon={Archive}
+        title="Archive Builder"
+        description="Pack files into a compressed archive entirely in your browser. Nothing is uploaded."
+      >
         <div className="space-y-6">
           {/* Format picker */}
           <div className="space-y-1.5">
@@ -785,7 +773,7 @@ export default function ArchiveBuilderPage() {
             </div>
           )}
         </div>
-      </div>
+      </UtilPageShell>
     </TooltipProvider>
   )
 }
