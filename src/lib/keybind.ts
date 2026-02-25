@@ -23,11 +23,16 @@ interface KeybindHandle {
 export class KeybindManager implements Disposable {
   private handles = new Map<string, KeybindHandle[]>();
   private enabled = true;
-  private boundHandler: (e: KeyboardEvent) => void;
+  private boundHandler: EventListener;
+  private capture: boolean;
 
-  constructor(public parent: HTMLElement) {
-    this.boundHandler = this.handleKeydown.bind(this);
-    this.parent.addEventListener("keydown", this.boundHandler);
+  constructor(
+    public parent: HTMLElement | Document,
+    { capture = false }: { capture?: boolean } = {},
+  ) {
+    this.capture = capture;
+    this.boundHandler = this.handleKeydown.bind(this) as EventListener;
+    this.parent.addEventListener("keydown", this.boundHandler, { capture });
   }
 
   private handleKeydown(event: KeyboardEvent) {
@@ -82,7 +87,9 @@ export class KeybindManager implements Disposable {
     modifiers: Set<string>;
   } {
     // Normalize "+" key alias before splitting on "+"
-    const normalized = template.toLowerCase().replace(/(?<![a-z])(\+)$/i, "plus");
+    const normalized = template
+      .toLowerCase()
+      .replace(/(?<![a-z])(\+)$/i, "plus");
     const parts = normalized.split("+");
     const key = parts[parts.length - 1];
     const modifiers = new Set(parts.slice(0, -1).filter(Boolean));
@@ -193,7 +200,9 @@ export class KeybindManager implements Disposable {
   }
 
   dispose() {
-    this.parent.removeEventListener("keydown", this.boundHandler);
+    this.parent.removeEventListener("keydown", this.boundHandler, {
+      capture: this.capture,
+    });
     this.unregisterAll();
   }
 
@@ -202,10 +211,12 @@ export class KeybindManager implements Disposable {
   }
 }
 
-// Helper to create a keybind manager for a specific element
-export function createKeybindManager(element: HTMLElement): KeybindManager {
-  return new KeybindManager(element);
+// Helper to create a keybind manager for a specific element or document
+export function createKeybindManager(
+  element: HTMLElement | Document,
+  opts?: { capture?: boolean },
+): KeybindManager {
+  return new KeybindManager(element, opts);
 }
 
-// Default instance for document-wide keybinds
-export const keybindManager = new KeybindManager(document.body);
+export const keybindManager = createKeybindManager(document.body);
