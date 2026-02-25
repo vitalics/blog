@@ -812,9 +812,9 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           onChange={handleChange}
           // biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
-          onLibraryChange={(items: any[]) => {
-            setLibraryItems(items);
-            dbPutLibrary(items).catch(() => {});
+          onLibraryChange={(items: readonly any[]) => {
+            setLibraryItems([...items]);
+            dbPutLibrary([...items]).catch(() => {});
           }}
           initialData={{ libraryItems }}
           libraryReturnUrl={
