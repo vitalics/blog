@@ -41,8 +41,9 @@ interface Session {
 // ---------------------------------------------------------------------------
 
 const IDB_DB = "excalidraw-editor";
-const IDB_VER = 2;
+const IDB_VER = 3;
 const IDB_SESSIONS = "sessions";
+const IDB_LIBRARY = "library";
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -53,6 +54,9 @@ function openDb(): Promise<IDBDatabase> {
       if (db.objectStoreNames.contains("scenes")) db.deleteObjectStore("scenes");
       if (!db.objectStoreNames.contains(IDB_SESSIONS))
         db.createObjectStore(IDB_SESSIONS, { keyPath: "id" });
+      // v3 — shared library store
+      if (!db.objectStoreNames.contains(IDB_LIBRARY))
+        db.createObjectStore(IDB_LIBRARY);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -99,6 +103,30 @@ async function dbDelete(id: string): Promise<void> {
   });
 }
 
+const LIBRARY_KEY = "singleton";
+
+// biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
+async function dbGetLibrary(): Promise<any[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_LIBRARY, "readonly");
+    const req = tx.objectStore(IDB_LIBRARY).get(LIBRARY_KEY);
+    req.onsuccess = () => resolve((req.result as any[]) ?? []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
+async function dbPutLibrary(items: any[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_LIBRARY, "readwrite");
+    tx.objectStore(IDB_LIBRARY).put(items, LIBRARY_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -111,13 +139,18 @@ function newSession(name = "Untitled"): Session {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function ExcalidrawEditor() {
+export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: string }) {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentId, setCurrentId] = useState<string>("");
+  // biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
+  const libraryItemsRef = useRef<any[]>([]);
+  useEffect(() => { libraryItemsRef.current = libraryItems; }, [libraryItems]);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -133,6 +166,13 @@ export default function ExcalidrawEditor() {
 
   const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null);
   useEffect(() => { excalidrawAPIRef.current = excalidrawAPI; }, [excalidrawAPI]);
+
+  // Ref tracking whether we've already handled the #addLibrary hash this mount
+  const libraryImportHandledRef = useRef(false);
+  // Set to true after a #addLibrary import completes; cleared once pushed to the API
+  const libraryNeedsFlushRef = useRef(false);
+  // Hash passed from the wrapper, captured before the dynamic import resolved
+  const capturedHashRef = useRef(initialHash);
 
   // ---------------------------------------------------------------------------
   // Bootstrap: load all sessions, pick the most-recently-updated one
@@ -152,7 +192,75 @@ export default function ExcalidrawEditor() {
         setNameInput(sorted[0].name);
       }
     }).catch(() => {});
+
+    dbGetLibrary().then((items) => {
+      if (items.length > 0) setLibraryItems(items);
+    }).catch(() => {}).finally(() => {
+      setLibraryLoaded(true);
+    });
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Handle #addLibrary=<url> redirect from libraries.excalidraw.com
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!libraryLoaded || libraryImportHandledRef.current) return;
+
+    const hash = capturedHashRef.current;
+    const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
+    const libUrl = params.get("addLibrary");
+    if (!libUrl) return;
+
+    libraryImportHandledRef.current = true;
+    // Remove hash from URL without triggering navigation
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+
+    fetch(libUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch library: ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        // biome-ignore lint/suspicious/noExplicitAny: excalidraw library format
+        const incoming: any[] = data?.library ?? data?.libraryItems ?? [];
+        if (incoming.length === 0) return;
+
+        // Merge by id — skip items already in the library
+        const existing = libraryItemsRef.current;
+        // biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
+        const existingIds = new Set(existing.map((item: any) => item.id));
+        // biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
+        const fresh = incoming.filter((item: any) => !existingIds.has(item.id));
+        if (fresh.length === 0) return;
+
+        const merged = [...existing, ...fresh];
+        setLibraryItems(merged);
+        dbPutLibrary(merged).catch(() => {});
+        libraryNeedsFlushRef.current = true;
+
+        // Push to the live Excalidraw instance if ready; otherwise the flush effect
+        // will pick it up once excalidrawAPI becomes available after remount
+        const api = excalidrawAPIRef.current;
+        if (api) {
+          api.updateLibrary({ libraryItems: merged, merge: false });
+          libraryNeedsFlushRef.current = false;
+        }
+      })
+      .catch(() => {
+        // Silently ignore fetch/parse errors
+      });
+  }, [libraryLoaded]);
+
+  // ---------------------------------------------------------------------------
+  // Flush pending library import once excalidrawAPI becomes available
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!excalidrawAPI || !libraryNeedsFlushRef.current) return;
+    const items = libraryItemsRef.current;
+    if (items.length === 0) return;
+    excalidrawAPI.updateLibrary({ libraryItems: items, merge: false });
+    libraryNeedsFlushRef.current = false;
+  }, [excalidrawAPI]);
 
   // ---------------------------------------------------------------------------
   // Load session into canvas whenever currentId changes
@@ -608,6 +716,17 @@ export default function ExcalidrawEditor() {
           key={currentId}
           excalidrawAPI={(api) => setExcalidrawAPI(api)}
           onChange={handleChange}
+          // biome-ignore lint/suspicious/noExplicitAny: excalidraw library item types not publicly exported
+          onLibraryChange={(items: any[]) => {
+            setLibraryItems(items);
+            dbPutLibrary(items).catch(() => {});
+          }}
+          initialData={{ libraryItems }}
+          libraryReturnUrl={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/utils/excalidraw`
+              : "/utils/excalidraw"
+          }
           UIOptions={{
             canvasActions: {
               export: false,
