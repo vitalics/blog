@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ImageIcon, Archive, FileText, QrCode, ScanLine, Barcode, ImageIcon, Archive, PenLine } from 'lucide-react'
+import { ImageIcon, Archive, FileText, QrCode, ScanLine, Barcode, PenLine } from 'lucide-react'
 
 export const metadata = {
   title: 'Utils',

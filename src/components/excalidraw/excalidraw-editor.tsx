@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Excalidraw, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
+import { KeybindManager } from "@/lib/keybind";
 import {
   ArrowLeft,
   Download,
@@ -177,6 +178,8 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
 
   const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null);
   useEffect(() => { excalidrawAPIRef.current = excalidrawAPI; }, [excalidrawAPI]);
+
+  const excalidrawContainerRef = useRef<HTMLDivElement>(null);
 
   // Ref tracking whether we've already handled the #addLibrary hash this mount
   const libraryImportHandledRef = useRef(false);
@@ -437,6 +440,46 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
     const session = sessionsRef.current.find((s) => s.id === id);
     if (session) dbPut(session).catch(() => {});
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Global keybinds
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const km = new KeybindManager(document.body);
+
+    // Ctrl+S — manual save (prevent browser "Save page" dialog)
+    km.register("ctrl+s", ({ event }) => {
+      event.preventDefault();
+      handleSave();
+    });
+
+    // Ctrl+Z / Ctrl+Shift+Z — undo/redo forwarded to Excalidraw container
+    // Excalidraw handles these natively when its canvas is focused; we forward
+    // the event from document level so they work even when focus is in the toolbar.
+    const forwardToCanvas = (event: KeyboardEvent) => {
+      const container = excalidrawContainerRef.current;
+      if (!container) return;
+      // Only forward if the event did not originate inside the canvas already
+      if (container.contains(event.target as Node)) return;
+      event.preventDefault();
+      const clone = new KeyboardEvent("keydown", {
+        key: event.key,
+        code: event.code,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      container.dispatchEvent(clone);
+    };
+
+    km.register("ctrl+z", ({ event }) => forwardToCanvas(event));
+    km.register("ctrl+shift+z", ({ event }) => forwardToCanvas(event));
+
+    return () => km.dispose();
+  }, [handleSave]);
 
   // ---------------------------------------------------------------------------
   // Web Share (PNG)
@@ -805,7 +848,7 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
       {/* ------------------------------------------------------------------ */}
       {/* Editor                                                               */}
       {/* ------------------------------------------------------------------ */}
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1" ref={excalidrawContainerRef}>
         <Excalidraw
           key={currentId}
           theme={resolvedTheme}
