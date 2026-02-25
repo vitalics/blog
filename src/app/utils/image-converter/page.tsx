@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check, ArrowLeft, Share2 } from 'lucide-react'
+import { Upload, Download, ImageIcon, X, ArrowRight, Lock, Unlock, Sparkles, Eye, EyeOff, RefreshCw, ChevronsUpDown, Check, Share2 } from 'lucide-react'
+import { UtilPageShell } from '@/components/util-page-shell'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -113,7 +113,6 @@ function maskApiKey(key: string): string {
 // ---------------------------------------------------------------------------
 
 export default function ImageConverterPage() {
-  const router = useRouter()
 
   // --- source image ---
   const [sourceFile, setSourceFile] = useState<File | null>(null)
@@ -481,21 +480,11 @@ export default function ImageConverterPage() {
 
   return (
     <TooltipProvider>
-      <div className="mx-auto max-w-4xl px-4 py-12">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="mb-2 flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Go back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <ImageIcon className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-            <h1 className="text-4xl font-bold">Image Converter</h1>
-          </div>
-          <p className="text-muted-foreground">
-            Convert and resize images entirely in your browser. Nothing is uploaded — runs in a Web Worker.
-          </p>
-        </div>
-
+      <UtilPageShell
+        icon={ImageIcon}
+        title="Image Converter"
+        description="Convert and resize images entirely in your browser. Nothing is uploaded — runs in a Web Worker."
+      >
         <div className="grid gap-8 lg:grid-cols-2">
           {/* ---------------------------------------------------------------- */}
           {/* Left: Drop zone                                                   */}
@@ -1032,7 +1021,7 @@ export default function ImageConverterPage() {
             </div>
           )}
         </section>
-      </div>
+      </UtilPageShell>
     </TooltipProvider>
   )
 }
