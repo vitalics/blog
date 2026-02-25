@@ -17,6 +17,30 @@ const UTILS_TOOLS: SearchResult[] = [
     description: 'Pack files into ZIP, TAR.GZ, or GZip archives in your browser.',
     url: '/utils/zip-builder',
   },
+  {
+    type: 'tool',
+    title: 'PDF Viewer',
+    description: 'View and annotate PDF files in your browser. Zoom, paginate, add text and QR codes — nothing is uploaded.',
+    url: '/utils/pdf-viewer',
+  },
+  {
+    type: 'tool',
+    title: 'QR Code Generator',
+    description: 'Generate QR codes from any text or URL with custom colors and error correction levels.',
+    url: '/utils/qr-code',
+  },
+  {
+    type: 'tool',
+    title: 'QR Code Extractor',
+    description: 'Decode QR codes from images or your camera using the native browser BarcodeDetector API.',
+    url: '/utils/qr-extractor',
+  },
+  {
+    type: 'tool',
+    title: 'Barcode Extractor',
+    description: 'Decode barcodes (EAN-13, Code 128, UPC, PDF417, and more) from images or your camera.',
+    url: '/utils/barcode-extractor',
+  },
 ]
 
 export async function getSearchData(): Promise<SearchResult[]> {

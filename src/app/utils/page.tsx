@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ImageIcon, Archive } from 'lucide-react'
+import { ImageIcon, Archive, FileText, QrCode, ScanLine, Barcode } from 'lucide-react'
 
 export const metadata = {
   title: 'Utils',
@@ -20,6 +20,34 @@ const TOOLS = [
     name: 'Archive Builder',
     description: 'Pack files into ZIP, TAR.GZ, or GZip archives in your browser. Includes the extract command for your OS.',
     tags: ['zip', 'tar', 'gzip', 'archive', 'files'],
+  },
+  {
+    href: '/utils/pdf-viewer',
+    icon: FileText,
+    name: 'PDF Viewer',
+    description: 'View PDF files in your browser. Zoom, paginate, and share — nothing is uploaded.',
+    tags: ['pdf', 'viewer', 'documents'],
+  },
+  {
+    href: '/utils/qr-code',
+    icon: QrCode,
+    name: 'QR Code Generator',
+    description: 'Generate QR codes from any text or URL with custom colors and error correction levels.',
+    tags: ['qr', 'qrcode', 'generator'],
+  },
+  {
+    href: '/utils/qr-extractor',
+    icon: ScanLine,
+    name: 'QR Code Extractor',
+    description: 'Decode QR codes from images or your camera. Uses the native browser BarcodeDetector API.',
+    tags: ['qr', 'scanner', 'decoder', 'camera'],
+  },
+  {
+    href: '/utils/barcode-extractor',
+    icon: Barcode,
+    name: 'Barcode Extractor',
+    description: 'Decode barcodes (EAN-13, Code 128, UPC, PDF417, and more) from images or your camera.',
+    tags: ['barcode', 'ean', 'upc', 'scanner', 'decoder'],
   },
 ]
 
