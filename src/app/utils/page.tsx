@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ImageIcon, Archive, FileText, QrCode, ScanLine, Barcode } from 'lucide-react'
+import { ImageIcon, Archive, FileText, QrCode, ScanLine, Barcode, ImageIcon, Archive, PenLine } from 'lucide-react'
 
 export const metadata = {
   title: 'Utils',
@@ -22,6 +22,11 @@ const TOOLS = [
     tags: ['zip', 'tar', 'gzip', 'archive', 'files'],
   },
   {
+    href: '/utils/excalidraw',
+    icon: PenLine,
+    name: 'Excalidraw',
+    description: 'Virtual whiteboard for sketching diagrams and freehand drawings. Scene is auto-saved locally in your browser.',
+    tags: ['drawing', 'diagrams', 'whiteboard', 'sketch'],
     href: '/utils/pdf-viewer',
     icon: FileText,
     name: 'PDF Viewer',
