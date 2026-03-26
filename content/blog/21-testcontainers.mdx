@@ -1,0 +1,210 @@
+---
+title: "I Got Tired of Writing the Same Container Boilerplate, So I Packaged It"
+description: "How @playwright-labs/fixture-testcontainers eliminates Docker lifecycle boilerplate in Playwright integration tests — and why real containers beat mocks."
+tags: ["playwright", "testcontainers", "docker", "typescript", "testing"]
+telegram_channel: "haradkou_sdet"
+authors: ["vitalics"]
+date: 2026-03-26
+image: "/blog/21-testcontainers/hero.webp"
+---
+
+# I Got Tired of Writing the Same Container Boilerplate, So I Packaged It
+
+Every time I wrote an integration test that needed a real database, I wrote the same block of code. `beforeAll`, start the container. `afterAll`, stop it. Wrap the variable in a `let` at the top of the file so both hooks can see it. Hope nothing throws between start and stop.
+
+It works. It has always worked. And every time I wrote it, I felt like I was solving a problem that should already be solved.
+
+So I built `@playwright-labs/fixture-testcontainers`.
+
+---
+
+## What I was actually tired of
+
+Here is the boilerplate. You have probably written some version of it yourself:
+
+```typescript
+import { GenericContainer, StartedTestContainer } from "testcontainers";
+import { test } from "@playwright/test";
+
+let container: StartedTestContainer;
+
+test.beforeAll(async () => {
+  container = await new GenericContainer("postgres:16")
+    .withEnvironment({ POSTGRES_PASSWORD: "secret" })
+    .withExposedPorts(5432)
+    .start();
+});
+
+test.afterAll(async () => {
+  await container?.stop();
+});
+
+test("insert and select", async () => {
+  const port = container.getMappedPort(5432);
+  // finally, the test
+});
+```
+
+The test is five lines. The infrastructure around it is fourteen. And that is before you add a second container, a network between them, or a health check.
+
+There is also a subtler issue: all tests in the file share the same container instance. That is fine when your tests are purely read-only, but the moment one test inserts a row that another test was not expecting, you have a flaky test that only fails when the two run in a specific order. The instinct is to add cleanup inside each test. The result is tests that are half test, half janitor.
+
+---
+
+## Playwright already solved this for browsers
+
+Playwright's fixture system is genuinely one of the nicest testing primitives I have worked with. A fixture declares what it needs, provides something to the test, and cleans up after itself — automatically, even when the test throws. Tests just declare what they want:
+
+```typescript
+test("my test", async ({ page, context }) => {
+  // page and context are started and stopped automatically
+});
+```
+
+There was no reason containers should be any harder. The lifecycle is identical: start before the test, stop after, handle failures gracefully.
+
+---
+
+## What the package does
+
+It wraps Testcontainers in a Playwright fixture called `useContainer`. The fixture tracks every container you start inside a test and stops them all — in parallel — when the test ends.
+
+```typescript
+import { test } from "@playwright-labs/fixture-testcontainers";
+import { Wait } from "testcontainers";
+
+test("postgres integration", async ({ useContainer }) => {
+  const pg = await useContainer("postgres:16", {
+    ports: 5432,
+    environment: { POSTGRES_PASSWORD: "secret" },
+    waitStrategy: Wait.forLogMessage("ready to accept connections"),
+  });
+
+  const port = pg.getMappedPort(5432);
+  // do your test
+  // pg.stop() is called automatically
+});
+```
+
+No `beforeAll`. No `afterAll`. No shared `let` at the top of the file. No cleanup code.
+
+The second fixture, `useContainerFromDockerFile`, handles the case where you are building a custom image during the test:
+
+```typescript
+test("my service", async ({ useContainerFromDockerFile }) => {
+  const app = await useContainerFromDockerFile("./docker", "Dockerfile", {
+    ports: 3000,
+    waitStrategy: Wait.forHttp("/health", 3000),
+  });
+});
+```
+
+---
+
+## The part I am most happy about: composition
+
+The raw fixture is useful. But the design I cared most about was whether it composed naturally with Playwright's existing extension mechanism.
+
+It does. Because `useContainer` is a Playwright fixture, you can use it as an input to your own fixtures:
+
+```typescript
+import { test as base } from "@playwright-labs/fixture-testcontainers";
+import { Pool } from "pg";
+import { Wait } from "testcontainers";
+
+export const test = base.extend<{ db: Pool }>({
+  db: async ({ useContainer }, use) => {
+    const container = await useContainer("postgres:16", {
+      ports: 5432,
+      environment: { POSTGRES_PASSWORD: "secret" },
+      waitStrategy: Wait.forLogMessage("ready to accept connections"),
+    });
+
+    const pool = new Pool({
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      user: "postgres",
+      password: "secret",
+      database: "postgres",
+    });
+
+    await use(pool);
+    await pool.end();
+  },
+});
+```
+
+Tests import `test` from your fixtures file and receive a ready-to-use `Pool`. They have no idea Docker is involved:
+
+```typescript
+import { test } from "./fixtures";
+
+test("user persists", async ({ db }) => {
+  await db.query("INSERT INTO users (name) VALUES ($1)", ["Alice"]);
+  const { rows } = await db.query("SELECT name FROM users WHERE name = $1", ["Alice"]);
+  expect(rows[0].name).toBe("Alice");
+});
+```
+
+This is the pattern I wanted. Infrastructure as an implementation detail of the fixture layer, invisible to the tests themselves.
+
+---
+
+## The matchers
+
+I also added a set of custom `expect` matchers for `StartedTestContainer`. Before this, asserting on container state meant reaching into the Docker API manually:
+
+```typescript
+const client = await getContainerRuntimeClient();
+const info = await client.container.inspect(client.container.getById(container.getId()));
+expect(info.State.Running).toBe(true);
+```
+
+Now it is:
+
+```typescript
+import { expect } from "@playwright-labs/fixture-testcontainers";
+
+await expect(container).toBeContainerRunning();
+await expect(container).toBeContainerHealthy();
+await expect(container).toMatchContainerLogMessage("ready to accept connections");
+expect(container).toBeContainerPort(5432);
+expect(container).toMatchContainerPortInRange(5432, { min: 1024 });
+```
+
+There are 13 matchers in total, covering state, logs, ports, labels, networks, names, and users. All of them support `.not`. The string-based ones accept an optional `Intl.Collator` for locale-aware comparisons, which came up when I was writing tests for a French-locale service:
+
+```typescript
+const fr = new Intl.Collator("fr", { sensitivity: "base" });
+await expect(container).toMatchContainerLogMessage("bonjour", fr);
+```
+
+---
+
+## A note on speed
+
+The first objection to real containers is always speed. A Postgres container takes a few seconds to become ready. A mock returns in microseconds.
+
+My answer: yes, and I think this trade-off is almost always worth it.
+
+The goal of a test is to tell you whether the code works. A mock that returns the expected result regardless of what the code sends it is not telling you whether the code works — it is telling you whether the code calls the mock correctly. That is a different and much less useful property.
+
+In practice, Playwright runs tests in parallel across multiple workers. A container that takes five seconds to start adds five seconds to one worker, not to the entire suite. The wall-clock impact is usually smaller than teams expect, and the improvement in confidence in the tests more than compensates.
+
+I wrote this package because I believe real infrastructure in integration tests is the right default, not an edge case for particularly careful teams. Removing the boilerplate was my way of making that default easier to reach for.
+
+---
+
+## Installation
+
+```bash
+npm install -D @playwright-labs/fixture-testcontainers testcontainers
+```
+
+Requires `@playwright/test >= 1.57.0`, `testcontainers >= 10.0.0`, and Docker running locally or in your CI environment.
+
+The full source, README, and tests are on GitHub as part of [playwright-labs](https://github.com/vitalics/playwright-labs) — a collection of Playwright utilities I have been building over time.
+
+---
+
+If you have been meaning to replace some mocks with real containers and kept putting it off because of the setup cost, I hope this makes it easier. And if you run into anything unexpected, open an issue.
