@@ -1,0 +1,241 @@
+---
+title: "I Built an Angular-Aware Playwright Selector Engine"
+description: "The story behind @playwright-labs/selectors-angular — why I built it, how it works internally, and what problems it solves for Angular E2E testing."
+tags: [angular, playwright, open-source, typescript, testing]
+telegram_channel: "haradkou_sdet"
+authors: ["vitalics"]
+date: 2026-04-02
+image: "/blog/22-angular-selectors/hero.webp"
+---
+
+I've been writing Angular E2E tests for a while, and one thing has always bothered me: the tests I write bear no resemblance to the app I'm testing.
+
+Angular apps are built from components with typed inputs, signal state, and event outputs. But Playwright tests still query the DOM like it's 2010 — CSS selectors, `data-testid` attributes, nth-child tricks. The component model is completely invisible to the test layer.
+
+So I built `@playwright-labs/selectors-angular`.
+
+## The Itch
+
+Here's a button component:
+
+```typescript
+@Component({
+  selector: "app-button",
+  template: `
+    <button [disabled]="disabled" [class]="type">
+      {{ label }}
+    </button>
+  `,
+})
+export class ButtonComponent {
+  @Input() label = "";
+  @Input() disabled = false;
+  @Input() type: "primary" | "secondary" | "danger" = "primary";
+  @Output() clicked = new EventEmitter<void>();
+}
+```
+
+The test I was writing:
+
+```typescript
+const deleteBtn = page.locator('button.danger[disabled]');
+```
+
+That test is asserting things about the template. The `danger` class is an implementation detail. So is using a `<button>` element, so is the `disabled` attribute. If I refactor the template to use a `<div>` with ARIA roles (for whatever reason), the test breaks — even though the component behavior is identical.
+
+What I wanted to write:
+
+```typescript
+const deleteBtn = page.locator('angular=app-button[type="danger"][disabled]');
+```
+
+This queries the *component*, not the DOM. It will survive any template refactor that preserves the component's inputs and behavior.
+
+## The Secret Ingredient: `window.ng`
+
+Angular ships a DevTools API in development builds. In your browser console, type `ng` and you'll see it — a collection of functions for inspecting the component tree:
+
+```javascript
+window.ng.getComponent(element)       // → component instance
+window.ng.getDirectives(element)      // → directive instances
+window.ng.getHostElement(component)   // → host DOM element
+window.ng.getOwningComponent(element) // → parent component instance
+```
+
+This API is what makes the whole thing possible. From a given DOM element, I can get the Angular component instance, read its actual `@Input()` property values, and decide whether the element matches the selector.
+
+## Building the Selector Engine
+
+Playwright has a [custom selector engine API](https://playwright.dev/docs/extensibility). You register an engine with a name, and then `page.locator('engineName=<query>')` will call your engine to evaluate the query.
+
+The engine needs to implement one method: `queryAll(scope, selector)` — given a DOM element as the search scope and the selector string, return all matching elements.
+
+### Parsing the Selector
+
+The first challenge was parsing the selector syntax. I wanted to support CSS-like attribute selectors:
+
+```
+app-button[label="Submit"][type^="prim"]
+```
+
+I wrote a recursive descent parser. It's not fancy but it handles everything I need:
+
+- Quoted strings (`"..."`, `'...'`)
+- Unquoted booleans and numbers (`true`, `false`, `42`)
+- Regular expressions (`/pattern/flags`)
+- Dot-notation property paths (`user.role`)
+- All 7 CSS attribute operators (`=`, `*=`, `^=`, `$=`, `|=`, `~=`, and bare truthy)
+- Case-insensitive flag (`i`)
+
+### Walking the Component Tree
+
+```typescript
+function buildComponentsAngularTree(root: Element): AngularNode[] {
+  const nodes: AngularNode[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+
+  let node: Element | null = root;
+  while (node) {
+    const component = window.ng.getComponent(node);
+    if (component) {
+      nodes.push({ element: node, component, /* ... */ });
+    }
+
+    // Also recurse into shadow DOM
+    if (node.shadowRoot) {
+      nodes.push(...buildComponentsAngularTree(node.shadowRoot as any));
+    }
+
+    node = walker.nextNode() as Element | null;
+  }
+
+  return nodes;
+}
+```
+
+### Matching Component Properties
+
+Once I have the component instance, I evaluate each attribute condition against it. Dot notation traversal:
+
+```typescript
+function matchesComponentAttribute(component: object, attr: AttributeSelectorPart): boolean {
+  const path = attr.name.split(".");
+  let value: unknown = component;
+
+  for (const key of path) {
+    if (value == null || typeof value !== "object") return false;
+    value = (value as Record<string, unknown>)[key];
+  }
+
+  return matchesAttributePart(value, attr);
+}
+```
+
+Then for the actual operator matching:
+
+```typescript
+function matchesAttributePart(value: unknown, attr: AttributeSelectorPart): boolean {
+  const { operator, expected, caseSensitive } = attr;
+
+  if (operator === "<truthy>") return Boolean(value);
+
+  const normalize = (v: string) => caseSensitive ? v : v.toLowerCase();
+  const actual = String(value);
+  const exp = expected instanceof RegExp ? expected : normalize(String(expected));
+
+  switch (operator) {
+    case "=":  return exp instanceof RegExp ? exp.test(actual) : normalize(actual) === exp;
+    case "*=": return normalize(actual).includes(exp as string);
+    case "^=": return normalize(actual).startsWith(exp as string);
+    case "$=": return normalize(actual).endsWith(exp as string);
+    case "~=": return normalize(actual).split(/\s+/).includes(exp as string);
+    case "|=": return normalize(actual) === exp || normalize(actual).startsWith(`${exp}-`);
+    default:   return false;
+  }
+}
+```
+
+## The `$ng` Fixture
+
+Beyond the selector engine, I wanted a way to read component state directly in test code — without routing through the DOM. The `NgHtmlElement` class wraps a Playwright `Locator` and adds Angular-specific methods:
+
+```typescript
+class NgHtmlElement {
+  async input<T>(name: string): Promise<T> {
+    return this.locator.evaluate(withNg((ng, el, propName) => {
+      const comp = ng.getComponent(el);
+      if (!comp) throw new Error("Not an Angular component");
+
+      const value = (comp as any)[propName];
+      if (value === undefined) {
+        const available = Object.keys(comp).join(", ");
+        throw new Error(`Input "${propName}" not found. Available: ${available}`);
+      }
+
+      // Detect and unwrap WritableSignal
+      if (typeof value === "function" && typeof value.set === "function") {
+        return value();
+      }
+
+      return value;
+    }), name) as Promise<T>;
+  }
+}
+```
+
+The `withNg` helper is a small trick to inject `window.ng` into browser-side evaluation functions. Since `locator.evaluate()` serializes functions as strings, I need to make sure `window.ng` isn't captured by closure — it needs to be read fresh in the browser context on each call.
+
+## Signal Detection
+
+Angular 17 introduced signal-based inputs (`input()`) alongside traditional `@Input()`. Detecting these requires reading the component's internal `ɵcmp` definition:
+
+```typescript
+// Signal-based inputs are flagged in the component metadata
+const compDef = constructor['ɵcmp'];
+const inputFlags = compDef?.inputs?.[propName]; // array like [alias, flags]
+const isSignalInput = Array.isArray(inputFlags) 
+  && typeof inputFlags[1] === "number" 
+  && (inputFlags[1] & 1) !== 0;
+```
+
+For `WritableSignal` (from `signal()`), detection is simpler — just check for `.set()` and `.update()` methods:
+
+```typescript
+const isWritableSignal = typeof value === "function" 
+  && typeof value.set === "function" 
+  && typeof value.update === "function";
+```
+
+Both get unwrapped by calling them as functions: `value()`.
+
+## What I Learned
+
+**Custom Playwright engines are surprisingly powerful.** The API is simple but the surface area is large — you can do anything a browser script can do, and Playwright passes the scope element so you can do proper subtree queries.
+
+**The Angular DevTools API is more useful than I expected.** It was designed for browser DevTools extensions but it's perfectly suited for testing tools too. The fact that it's available in dev mode and covers components, directives, signals, and host elements is exactly what you need.
+
+**Timing tests are hard on CI.** While building the sibling `fixture-timers` package I learned that timer-based assertions need generous tolerances — CI machines have jitter, and a `setTimeout(100)` might resolve in 85ms under load.
+
+## Try It
+
+```bash
+npm install -D @playwright-labs/selectors-angular
+```
+
+```typescript
+import { test, expect } from "@playwright-labs/selectors-angular";
+
+test("my first Angular-aware test", async ({ page, $ng }) => {
+  await page.goto("/");
+
+  // Query by component property
+  const btn = page.locator('angular=app-button[label="Submit"]');
+  await expect(btn).toBeVisible();
+
+  // Read component state
+  const label = await $ng("app-button").first().input<string>("label");
+  expect(label).toBe("Submit");
+});
+```
+
+The full package is in [playwright-labs](https://github.com/vitalics/playwright-labs). Feedback and contributions welcome.
