@@ -1,0 +1,406 @@
+---
+title: "@playwright-labs/reporter-slack: Rich Slack Notifications for Playwright Test Runs"
+description: "A Playwright reporter that sends structured, interactive Slack messages with test results, environment context, and auto-masked secrets. This post covers setup, the three built-in templates, transport options, and writing custom templates."
+tags: [playwright, slack, typescript, testing, open-source, ci-cd]
+telegram_channel: "haradkou_sdet"
+authors: ["vitalics"]
+date: 2026-04-30
+image: "/blog/24-pw-slack/hero.webp"
+---
+
+Today I'm shipping `@playwright-labs/reporter-slack` — a Playwright reporter that sends formatted Slack messages when your test run ends. This post covers everything: what it produces, how to configure it, the three built-in templates, the transport options, and how to write your own template when you need something custom.
+
+---
+
+## Why another Slack reporter?
+
+The existing options fall into two categories: they either produce a plain-text message that tells you pass or fail, or they require you to write a bunch of JSON to produce anything richer. Neither is where I wanted to land.
+
+What I wanted:
+
+- **Structured output by default** — test results grouped by status, failure reasons visible inline, no extra log-diving required
+- **Interactive elements** — a Slack dropdown filter so anyone in the channel can segment the results without opening a link
+- **Environment context** — a table of the env vars that characterize _where_ the run happened, with sensitive values masked automatically
+- **Custom templates** — a clean extension point when the built-ins don't fit your workflow
+
+All of this ships in `@playwright-labs/reporter-slack`.
+
+---
+
+## Installation and basic setup
+
+```bash
+pnpm add -D @playwright-labs/reporter-slack @playwright-labs/slack-buildkit
+```
+
+Minimal config:
+
+```typescript
+// playwright.config.ts
+import { defineConfig } from "@playwright/test";
+import { WithOptionsTemplate } from "@playwright-labs/reporter-slack/templates";
+
+export default defineConfig({
+  reporter: [
+    [
+      "@playwright-labs/reporter-slack",
+      {
+        send: { webhook: process.env.SLACK_WEBHOOK_URL },
+        template: WithOptionsTemplate,
+      },
+    ],
+  ],
+});
+```
+
+Set `SLACK_WEBHOOK_URL` in your environment (CI secret or `.env.local`) and you're done. The reporter accumulates test results as the suite runs, then calls your template in `onEnd` and posts the payload to Slack.
+
+---
+
+## What a message looks like
+
+### Failed run — `WithOptionsTemplate`
+
+```
+❌ My App — Tests failed
+
+Total: 42   |   Duration: 22.1s   |   Started: Mon, 28 Apr 2025 09:15:00 UTC
+
+[Filter by status ▾]   [View Full Report →]
+
+──────────────────────────────────────
+❌ Failed — 3 tests
+• `Auth › forgot password`
+  _Expected button to be enabled_
+• `Shop › checkout flow`
+  _TimeoutError: Waiting for locator('[data-testid=checkout]') timed out after 5000ms_
+• `Shop › apply coupon`
+  _AssertionError: expected 200, got 404_
+
+⏩ Skipped — 2 tests
+
+✅ Passed — 37 tests
+• `Auth › login works`
+• `Auth › logout works`
+• `Shop › add to cart`
+• `Shop › remove from cart`
+• `Shop › update quantity`
+  _…and 32 more_
+```
+
+Key observations:
+
+- Status groups are ordered: failed → timedOut → interrupted → skipped → passed
+- The first line of each error message appears directly under the test name
+- The interactive dropdown lets Slack users filter by status in-place
+- Overflow tests show "…and N more" rather than flooding the channel
+- The View Full Report button links to your CI artifact (configurable)
+
+### Failed run — `WithTableTemplate`
+
+Adds an environment context table above the test groups:
+
+```
+❌ My App — Tests failed
+
+Total: 42  •  ✅ 37  •  ❌ 3  •  ⏩ 2  •  ⏱ 22.1s
+
+──────────────────────────────────────
+Build Environment
+
+| Variable      | Value                  |
+| ---           | ---                    |
+| `CI`          | true                   |
+| `BRANCH`      | feature/auth-refactor  |
+| `BUILD_ID`    | run-142                |
+| `DEPLOY_ENV`  | staging                |
+| `DB_HOST`     | db.internal.example.com|
+| `DB_PASSWORD` | ••••••••               |
+| `API_KEY`     | ••••••••               |
+
+──────────────────────────────────────
+❌ Failed — 3 tests
+…
+```
+
+---
+
+## The three built-in templates
+
+### `BaseTemplate`
+
+The simplest template. Header (pass/fail emoji + project name), total count and duration, a list of the failing tests (max 10 by default), and an optional "View Full Report" button.
+
+Good for: small projects, low-noise channels, green runs where you just want confirmation.
+
+```typescript
+import { BaseTemplate } from "@playwright-labs/reporter-slack/templates";
+
+template: (result, testCases) =>
+  BaseTemplate(result, testCases, {
+    projectName: "My App",
+    reportUrl: process.env.REPORT_URL,
+  }),
+```
+
+### `WithOptionsTemplate`
+
+Status-grouped template with an interactive `static_select` filter. The filter options are built dynamically from the statuses that actually appear in the run — you won't see a "Timed out" option if no tests timed out.
+
+```typescript
+import { WithOptionsTemplate } from "@playwright-labs/reporter-slack/templates";
+
+template: (result, testCases) =>
+  WithOptionsTemplate(result, testCases, {
+    projectName: "My App",
+    reportUrl:   process.env.REPORT_URL,
+    maxPerStatus: 5,           // show at most 5 test names per group
+    showTestNames: true,       // default; set false for header-only output
+    show: {
+      passed: false,           // hide the passed group to reduce noise
+    },
+  }),
+```
+
+**Config reference:**
+
+| Option             | Type      | Default        | Description                            |
+| ------------------ | --------- | -------------- | -------------------------------------- |
+| `projectName`      | `string`  | `"Playwright"` | Displayed in header and context footer |
+| `reportUrl`        | `string`  | —              | URL for the "View Full Report" button  |
+| `maxPerStatus`     | `number`  | `10`           | Max test names shown per status group  |
+| `showTestNames`    | `boolean` | `true`         | Show individual test names             |
+| `show.failed`      | `boolean` | `true`         | Include the failed group               |
+| `show.passed`      | `boolean` | `true`         | Include the passed group               |
+| `show.skipped`     | `boolean` | `true`         | Include the skipped group              |
+| `show.timedOut`    | `boolean` | `true`         | Include the timedOut group             |
+| `show.interrupted` | `boolean` | `true`         | Include the interrupted group          |
+
+### `WithTableTemplate`
+
+Same as `WithOptionsTemplate` for the test results section, but adds a GFM table of environment variables at the top. Designed for teams that run suites across multiple environments (staging, production, feature branches) and need the context at a glance.
+
+```typescript
+import { WithTableTemplate } from "@playwright-labs/reporter-slack/templates";
+
+template: (result, testCases) =>
+  WithTableTemplate(result, testCases, {
+    projectName: "My App",
+    reportUrl:   process.env.REPORT_URL,
+    tableTitle:  "Build Environment",     // heading above the table
+    env: {
+      CI:          process.env.CI,
+      BRANCH:      process.env.BRANCH,
+      BUILD_ID:    process.env.BUILD_ID,
+      COMMIT_SHA:  process.env.COMMIT_SHA,
+      DEPLOY_ENV:  process.env.DEPLOY_ENV,
+      DB_HOST:     process.env.DB_HOST,
+      DB_PASSWORD: process.env.DB_PASSWORD,  // auto-masked
+      API_KEY:     process.env.API_KEY,       // auto-masked
+    },
+    showRunSummary: true,   // totals row above the table (default: true)
+    rowsPerChunk:   30,     // rows per markdown block (default: 30)
+  }),
+```
+
+**Config reference:**
+
+| Option           | Type                                  | Default         | Description                                   |
+| ---------------- | ------------------------------------- | --------------- | --------------------------------------------- |
+| `env`            | `Record<string, string \| undefined>` | —               | **Required.** `undefined` values are omitted. |
+| `tableTitle`     | `string`                              | `"Environment"` | Heading displayed above the table             |
+| `mask`           | `boolean \| string[]`                 | `true`          | Masking strategy (see below)                  |
+| `showRunSummary` | `boolean`                             | `true`          | Show totals row above the table               |
+| `rowsPerChunk`   | `number`                              | `30`            | Rows per markdown block before splitting      |
+
+---
+
+## Auto-masking sensitive variables
+
+The default masking strategy (`mask: true`) replaces the value of any key whose name matches:
+
+```
+/token|secret|password|pass(?:word)?|credential|auth|api[_-]?key/i
+```
+
+So `DB_PASSWORD`, `AUTH_TOKEN`, `API_KEY`, `SECRET_KEY`, `STRIPE_CREDENTIAL` — all masked to `••••••••` without any configuration.
+
+Alternatives:
+
+```typescript
+// Mask only specific keys
+mask: ["CUSTOM_TOKEN", "INTERNAL_SECRET"];
+
+// Show all values (non-sensitive environments only)
+mask: false;
+```
+
+Masking happens before the payload is constructed — the raw value never appears in the Block Kit JSON that gets sent to Slack.
+
+---
+
+## Transport options
+
+### Incoming Webhook
+
+The zero-setup option. Create an Incoming Webhook app in your Slack workspace and paste the URL.
+
+```typescript
+send: {
+  webhook: process.env.SLACK_WEBHOOK_URL;
+}
+```
+
+Limitations: you cannot choose the channel (it's fixed on the webhook), and you cannot post replies to threads. Fine for most CI notification use cases.
+
+### Web API (`chat.postMessage`)
+
+Requires a Slack app with the `chat:write` scope. Gives you full control over channel, bot identity, and enables thread replies.
+
+```typescript
+send: {
+  token:   process.env.SLACK_BOT_TOKEN,  // xoxb-...
+  channel: "#ci-reports",
+}
+```
+
+---
+
+## Writing a custom template
+
+If the built-in templates don't fit your workflow, you can write your own. A template is a function with this signature:
+
+```typescript
+type SlackTemplate = (
+  result: FullResult,
+  testCases: [TestCase, TestResult][],
+  // optionally: your own config shape
+) => SlackBlock[];
+```
+
+You have access to all of Playwright's test data — titles, durations, errors, retries, attachments — and you can produce any Block Kit JSON you want.
+
+The reporter also ships `@playwright-labs/slack-buildkit`, a JSX runtime that lets you write templates as component trees. This is optional — you can return raw JSON if you prefer — but it makes complex templates significantly more readable:
+
+```tsx
+/** @jsxImportSource @playwright-labs/slack-buildkit/react */
+import {
+  Blocks,
+  Header,
+  Section,
+  Divider,
+  Table,
+  Tr,
+  Th,
+  Td,
+  Context,
+  Actions,
+  Button,
+} from "@playwright-labs/slack-buildkit/react";
+import type {
+  FullResult,
+  TestCase,
+  TestResult,
+} from "@playwright/test/reporter";
+
+export function MyTemplate(
+  result: FullResult,
+  testCases: [TestCase, TestResult][],
+) {
+  const failed = testCases.filter(([, r]) => r.status === "failed");
+  const passed = testCases.filter(([, r]) => r.status === "passed");
+  const emoji = result.status === "passed" ? ":white_check_mark:" : ":x:";
+  const label =
+    result.status === "passed" ? "All tests passed" : "Tests failed";
+
+  return (
+    <Blocks>
+      <Header>{`${emoji} My App — ${label}`}</Header>
+      <Section>{`*Total:* ${testCases.length}  •  ✅ ${passed.length}  •  ❌ ${failed.length}`}</Section>
+
+      {failed.length > 0 && (
+        <>
+          <Divider />
+          <Section>*Failed tests:*</Section>
+          <Table>
+            <Tr>
+              <Th>Test</Th>
+              <Th>First error</Th>
+            </Tr>
+            {failed.map(([test, r]) => (
+              <Tr>
+                <Td>{`\`${test.titlePath().slice(1).join(" › ")}\``}</Td>
+                <Td>{r.errors[0]?.message?.split("\n")[0] ?? "—"}</Td>
+              </Tr>
+            ))}
+          </Table>
+        </>
+      )}
+
+      <Divider />
+      <Actions>
+        <Button
+          url="https://ci.example.com"
+          style="primary"
+          action_id="view_report"
+        >
+          View Full Report
+        </Button>
+      </Actions>
+      <Context>{`My App • ${new Date().toUTCString()}`}</Context>
+    </Blocks>
+  );
+}
+```
+
+The `<Table>` component renders its `<Tr>/<Th>/<Td>` children as a GFM markdown table. `<Blocks>` flattens everything into a `SlackBlock[]` array. Register the template the same way as any built-in:
+
+```typescript
+template: MyTemplate,
+```
+
+---
+
+## Testing templates
+
+Because templates return plain JSON arrays, they're easy to test in isolation:
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { WithTableTemplate } from "@playwright-labs/reporter-slack/templates";
+
+const failedRun = { status: "failed", duration: 20000, startTime: new Date() };
+
+test("sensitive keys are masked in table output", () => {
+  const blocks = WithTableTemplate(failedRun, [], {
+    env: { DB_PASSWORD: "supersecret", BRANCH: "main" },
+  });
+  const text = blocks
+    .filter((b) => b.type === "markdown")
+    .map((b) => (b as any).text)
+    .join("\n");
+  expect(text).not.toContain("supersecret");
+  expect(text).toContain("••••••••");
+  expect(text).toContain("main");
+});
+
+test("no actions block when reportUrl is absent", () => {
+  const blocks = WithTableTemplate(failedRun, [], { env: {} });
+  expect(blocks.find((b) => b.type === "actions")).toBeUndefined();
+});
+```
+
+---
+
+## Packages
+
+| Package                           | Purpose                                                                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `@playwright-labs/reporter-slack` | The reporter — templates, transports, Playwright integration                                       |
+| `@playwright-labs/slack-buildkit` | JSX runtime and Block Kit component library (used internally; also available for custom templates) |
+
+```bash
+pnpm add -D @playwright-labs/reporter-slack @playwright-labs/slack-buildkit
+```
+
+Source: [github.com/vitaliharadkou/playwright-labs](https://github.com/vitaliharadkou/playwright-labs)
