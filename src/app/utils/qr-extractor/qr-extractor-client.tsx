@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ScanLine, Upload, Copy, Check, X, Camera } from 'lucide-react'
+import {
+  ArrowLeft, ScanLine, Upload, Copy, Check, X, Camera,
+  FlipHorizontal, Aperture, ChevronDown, ChevronUp,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ensureBarcodeDetector } from '@/lib/barcode-detector-polyfill'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,6 +16,7 @@ import { Button } from '@/components/ui/button'
 interface ScanResult {
   rawValue: string
   format: string
+  id: string
 }
 
 type Status = 'idle' | 'scanning' | 'done' | 'error' | 'unsupported'
@@ -31,50 +36,187 @@ function isUrl(s: string) {
 export default function QrExtractorPage() {
   const router = useRouter()
 
+  // ---- file-scan state ----
   const [status, setStatus] = useState<Status>('idle')
-  const [results, setResults] = useState<ScanResult[]>([])
+  const [fileResults, setFileResults] = useState<ScanResult[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
-  const [copied, setCopied] = useState<string | null>(null)
+
+  // ---- camera state ----
   const [cameraActive, setCameraActive] = useState(false)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const [capturing, setCapturing] = useState(false) // shutter flash + freeze
+  const [latestScan, setLatestScan] = useState<ScanResult | null>(null)
+  const [history, setHistory] = useState<ScanResult[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+
+  // ---- copy state ----
+  const [copied, setCopied] = useState<string | null>(null)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number | null>(null)
-
-  // Check BarcodeDetector support on mount
-  useEffect(() => {
-    if (!('BarcodeDetector' in window)) {
-      setStatus('unsupported')
-    }
-  }, [])
-
-  // Cleanup camera on unmount
-  useEffect(() => {
-    return () => stopCamera()
-  }, [])
+  const pauseRef = useRef(false)
 
   // ---------------------------------------------------------------------------
-  // Scan image file
+  // Init polyfill
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    ensureBarcodeDetector().catch(() => setStatus('unsupported'))
+  }, [])
+
+  useEffect(() => { return () => stopCamera() }, [])
+
+  // ---------------------------------------------------------------------------
+  // Camera helpers
+  // ---------------------------------------------------------------------------
+
+  const stopCamera = () => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    if (streamRef.current) { for (const t of streamRef.current.getTracks()) t.stop(); streamRef.current = null }
+    setCameraActive(false)
+    pauseRef.current = false
+  }
+
+  const addScan = useCallback((raw: string, format: string) => {
+    const result: ScanResult = { rawValue: raw, format, id: `${format}::${raw}` }
+    setLatestScan(result)
+    setHistory((prev) => {
+      if (prev.some((r) => r.rawValue === raw)) return prev
+      return [result, ...prev]
+    })
+  }, [])
+
+  const startCamera = useCallback(async (mode: 'environment' | 'user') => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    if (streamRef.current) { for (const t of streamRef.current.getTracks()) t.stop(); streamRef.current = null }
+
+    const video = videoRef.current
+    if (!video) return
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: mode } },
+      })
+      streamRef.current = stream
+      video.srcObject = stream
+      await video.play()
+      setCameraActive(true)
+
+      // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
+      const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
+
+      const scan = async () => {
+        if (!streamRef.current) return
+        if (!pauseRef.current) {
+          try {
+            const detected = await detector.detect(video)
+            if (detected.length > 0) {
+              addScan(detected[0].rawValue, detected[0].format)
+              pauseRef.current = true
+              setTimeout(() => { pauseRef.current = false }, 2000)
+            }
+          } catch { /* ignore per-frame errors */ }
+        }
+        rafRef.current = requestAnimationFrame(scan)
+      }
+      rafRef.current = requestAnimationFrame(scan)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Camera access denied.')
+      setStatus('error')
+    }
+  }, [addScan])
+
+  const handleStartCamera = () => startCamera(facingMode)
+
+  const handleFlipCamera = () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(next)
+    startCamera(next)
+  }
+
+  // Capture current video frame: freeze video, flash, scan, then resume
+  const handleCapture = async () => {
+    const video = videoRef.current
+    if (!video || !streamRef.current || capturing) return
+
+    // 1. Pause RAF loop so auto-scan doesn't interfere
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+
+    // 2. Freeze the video + trigger shutter flash
+    video.pause()
+    setCapturing(true)
+
+    // 3. Draw frozen frame to canvas
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (ctx) ctx.drawImage(video, 0, 0)
+
+    // 4. Scan the frozen frame
+    try {
+      // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
+      const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
+      const bitmap = await createImageBitmap(canvas)
+      const detected = await detector.detect(bitmap)
+      if (detected.length > 0) {
+        addScan(detected[0].rawValue, detected[0].format)
+      } else {
+        const orig = latestScan
+        setLatestScan({ rawValue: 'No QR code found in frame', format: '', id: '__none__' })
+        setTimeout(() => setLatestScan(orig), 1500)
+      }
+    } catch { /* ignore */ }
+
+    // 5. After 700 ms resume video and restart scan loop
+    setTimeout(() => {
+      setCapturing(false)
+      if (!streamRef.current) return
+      // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
+      video.play().then(() => {
+        const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
+        const scan = async () => {
+          if (!streamRef.current) return
+          if (!pauseRef.current) {
+            try {
+              const detected = await detector.detect(video)
+              if (detected.length > 0) {
+                addScan(detected[0].rawValue, detected[0].format)
+                pauseRef.current = true
+                setTimeout(() => { pauseRef.current = false }, 2000)
+              }
+            } catch { /* ignore */ }
+          }
+          rafRef.current = requestAnimationFrame(scan)
+        }
+        rafRef.current = requestAnimationFrame(scan)
+      }).catch(() => {})
+    }, 700)
+  }
+
+  // ---------------------------------------------------------------------------
+  // File scan
   // ---------------------------------------------------------------------------
 
   const scanImage = useCallback(async (file: File) => {
     setStatus('scanning')
-    setResults([])
+    setFileResults([])
     setErrorMsg(null)
-
     try {
       // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not yet in TS lib
-      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
       const bitmap = await createImageBitmap(file)
       const detected = await detector.detect(bitmap)
-
       if (detected.length === 0) {
         setErrorMsg('No QR code found in this image.')
         setStatus('error')
       } else {
-        setResults(detected.map((d: { rawValue: string; format: string }) => ({ rawValue: d.rawValue, format: d.format })))
+        setFileResults(detected.map((d: { rawValue: string; format: string }, i: number) => ({
+          rawValue: d.rawValue, format: d.format, id: `file-${i}`,
+        })))
         setStatus('done')
       }
     } catch (err) {
@@ -82,10 +224,6 @@ export default function QrExtractorPage() {
       setStatus('error')
     }
   }, [])
-
-  // ---------------------------------------------------------------------------
-  // File input / drag-drop
-  // ---------------------------------------------------------------------------
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -110,49 +248,6 @@ export default function QrExtractorPage() {
   }, [handleFile])
 
   // ---------------------------------------------------------------------------
-  // Camera scanning
-  // ---------------------------------------------------------------------------
-
-  const stopCamera = () => {
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
-    if (streamRef.current) { for (const t of streamRef.current.getTracks()) t.stop(); streamRef.current = null }
-    setCameraActive(false)
-  }
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      streamRef.current = stream
-      const video = videoRef.current
-      if (!video) { stopCamera(); return }
-      video.srcObject = stream
-      await video.play()
-      setCameraActive(true)
-
-      // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
-      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
-
-      const scan = async () => {
-        if (!streamRef.current) return
-        try {
-          const detected = await detector.detect(video)
-          if (detected.length > 0) {
-            setResults(detected.map((d: { rawValue: string; format: string }) => ({ rawValue: d.rawValue, format: d.format })))
-            setStatus('done')
-            stopCamera()
-            return
-          }
-        } catch { /* ignore per-frame errors */ }
-        rafRef.current = requestAnimationFrame(scan)
-      }
-      rafRef.current = requestAnimationFrame(scan)
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Camera access denied.')
-      setStatus('error')
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // Copy
   // ---------------------------------------------------------------------------
 
@@ -163,8 +258,7 @@ export default function QrExtractorPage() {
   }
 
   const handleClear = () => {
-    stopCamera()
-    setResults([])
+    setFileResults([])
     setStatus('idle')
     setErrorMsg(null)
   }
@@ -172,6 +266,8 @@ export default function QrExtractorPage() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+
+  const showDropZone = !cameraActive && (status === 'idle' || status === 'error')
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -193,37 +289,137 @@ export default function QrExtractorPage() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Browser not supported</p>
           <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-            QR code detection requires the <code>BarcodeDetector</code> API, available in Chrome, Edge, and Safari 17+.
+            QR code detection requires the <code>BarcodeDetector</code> API or WebAssembly support. Please use a modern browser.
           </p>
         </div>
       )}
 
       {status !== 'unsupported' && (
         <div className="space-y-4">
-          {/* Camera preview */}
-          {cameraActive && (
-            <div className="relative overflow-hidden rounded-xl border">
+
+          {/* ── Camera section ─────────────────────────────────────────── */}
+          <div className={cameraActive ? 'overflow-hidden rounded-xl border' : 'hidden'}>
+            <div className="relative">
               {/* biome-ignore lint/a11y/useMediaCaption: live camera stream */}
-              <video ref={videoRef} className="w-full" playsInline muted />
-              <div className="absolute inset-0 flex items-center justify-center">
+              <video ref={videoRef} className="w-full" playsInline autoPlay muted />
+              {/* Shutter flash overlay */}
+              {capturing && (
+                <div className="pointer-events-none absolute inset-0 animate-shutter bg-white" />
+              )}
+              {/* Viewfinder */}
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="h-48 w-48 rounded-lg border-4 border-primary/60" />
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute right-2 top-2 gap-1.5"
-                onClick={stopCamera}
-              >
-                <X className="h-3.5 w-3.5" /> Stop
-              </Button>
               <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-white drop-shadow">
                 Point camera at a QR code
               </p>
             </div>
-          )}
 
-          {/* Drop zone */}
-          {!cameraActive && (status === 'idle' || status === 'error') && (
+            {/* Camera controls */}
+            <div className="flex items-center justify-between gap-2 border-t bg-muted/40 px-3 py-2">
+              <Button variant="ghost" size="sm" className="gap-1.5" aria-label="Flip camera" onClick={handleFlipCamera}>
+                <FlipHorizontal className="h-4 w-4" />
+                <span className="hidden sm:inline">Flip</span>
+              </Button>
+
+              {/* Shutter / capture */}
+              <Button
+                variant="default"
+                size="icon"
+                className="h-12 w-12 rounded-full"
+                aria-label="Capture frame"
+                onClick={handleCapture}
+              >
+                <Aperture className="h-6 w-6" />
+              </Button>
+
+              <Button variant="ghost" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={stopCamera}>
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Stop</span>
+              </Button>
+            </div>
+
+            {/* Latest scan result */}
+            {latestScan && (
+              <div className="animate-in slide-in-from-bottom-2 border-t px-4 py-3 duration-200">
+                {latestScan.id === '__none__' ? (
+                  <p className="text-sm text-muted-foreground">{latestScan.rawValue}</p>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="mb-1 inline-block rounded-full bg-secondary px-2 py-0.5 text-xs">
+                        {latestScan.format}
+                      </span>
+                      {isUrl(latestScan.rawValue) ? (
+                        <a
+                          href={latestScan.rawValue}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block break-all text-sm text-primary underline underline-offset-2"
+                        >
+                          {latestScan.rawValue}
+                        </a>
+                      ) : (
+                        <p className="break-all font-mono text-sm">{latestScan.rawValue}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 gap-1.5"
+                      onClick={() => handleCopy(latestScan.rawValue)}
+                    >
+                      {copied === latestScan.rawValue
+                        ? <Check className="h-3.5 w-3.5 text-green-500" />
+                        : <Copy className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Scan history */}
+            {history.length > 1 && (
+              <div className="border-t">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-4 py-2 text-left text-xs text-muted-foreground hover:bg-muted/50"
+                  onClick={() => setHistoryOpen((v) => !v)}
+                >
+                  <span>History ({history.length} scanned)</span>
+                  {historyOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                {historyOpen && (
+                  <ul className="max-h-48 divide-y overflow-y-auto">
+                    {history.map((r) => (
+                      <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-2">
+                        <div className="min-w-0 flex-1">
+                          {isUrl(r.rawValue) ? (
+                            <a
+                              href={r.rawValue}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block truncate text-sm text-primary underline underline-offset-2"
+                            >
+                              {r.rawValue}
+                            </a>
+                          ) : (
+                            <p className="truncate text-sm font-mono">{r.rawValue}</p>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1.5" onClick={() => handleCopy(r.rawValue)}>
+                          {copied === r.rawValue ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Drop zone ──────────────────────────────────────────────── */}
+          {showDropZone && (
             <div
               role="button"
               tabIndex={0}
@@ -249,33 +445,34 @@ export default function QrExtractorPage() {
             </div>
           )}
 
-          {/* Camera button */}
-          {!cameraActive && (status === 'idle' || status === 'error') && (
-            <Button variant="outline" className="w-full gap-2" onClick={startCamera}>
+          {/* ── Camera button ──────────────────────────────────────────── */}
+          {showDropZone && (
+            <Button variant="outline" className="w-full gap-2" onClick={handleStartCamera}>
               <Camera className="h-4 w-4" />
               Scan with camera
             </Button>
           )}
 
-          {/* Scanning */}
+          {/* ── File scanning spinner ──────────────────────────────────── */}
           {status === 'scanning' && (
             <div className="flex min-h-48 items-center justify-center rounded-xl border">
               <p className="animate-pulse text-muted-foreground">Scanning…</p>
             </div>
           )}
 
-          {/* Results */}
-          {status === 'done' && results.length > 0 && (
+          {/* ── File scan results ──────────────────────────────────────── */}
+          {status === 'done' && fileResults.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{results.length} result{results.length !== 1 ? 's' : ''} found</p>
+                <p className="text-sm font-medium">
+                  {fileResults.length} result{fileResults.length !== 1 ? 's' : ''} found
+                </p>
                 <Button variant="ghost" size="sm" onClick={handleClear}>
                   <X className="mr-1.5 h-3.5 w-3.5" /> Clear
                 </Button>
               </div>
-              {results.map((r, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: stable list
-                <div key={i} className="rounded-lg border bg-card p-4">
+              {fileResults.map((r) => (
+                <div key={r.id} className="rounded-lg border bg-card p-4">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{r.format}</span>
                     <Button variant="ghost" size="sm" className="h-7 gap-1.5" onClick={() => handleCopy(r.rawValue)}>
