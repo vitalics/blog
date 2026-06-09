@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Barcode, Upload, Copy, Check, X, Camera } from 'lucide-react'
+import { ArrowLeft, Barcode, Upload, Copy, Check, X, Camera, FlipHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ensureBarcodeDetector } from '@/lib/barcode-detector-polyfill'
 
@@ -37,9 +37,11 @@ export default function BarcodeExtractorPage() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
   const [supportedFormats, setSupportedFormats] = useState<string[]>([])
 
   const inputRef = useRef<HTMLInputElement>(null)
+  // Video is always mounted (hidden via CSS) so the ref is always available
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -125,13 +127,21 @@ export default function BarcodeExtractorPage() {
     setCameraActive(false)
   }
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async (mode: 'environment' | 'user') => {
+    // Stop any existing stream first
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    if (streamRef.current) { for (const t of streamRef.current.getTracks()) t.stop(); streamRef.current = null }
+
+    const video = videoRef.current
+    if (!video) return
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: mode } },
+      })
       streamRef.current = stream
-      const video = videoRef.current
-      if (!video) { stopCamera(); return }
       video.srcObject = stream
+      // playsInline + muted are set via props; play() required on iOS
       await video.play()
       setCameraActive(true)
 
@@ -157,6 +167,14 @@ export default function BarcodeExtractorPage() {
       setErrorMsg(err instanceof Error ? err.message : 'Camera access denied.')
       setStatus('error')
     }
+  }, [supportedFormats])
+
+  const handleStartCamera = () => startCamera(facingMode)
+
+  const handleFlipCamera = () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment'
+    setFacingMode(next)
+    startCamera(next)
   }
 
   // ---------------------------------------------------------------------------
@@ -207,22 +225,39 @@ export default function BarcodeExtractorPage() {
 
       {status !== 'unsupported' && (
         <div className="space-y-4">
-          {/* Camera preview */}
-          {cameraActive && (
-            <div className="relative overflow-hidden rounded-xl border">
-              {/* biome-ignore lint/a11y/useMediaCaption: live camera stream */}
-              <video ref={videoRef} className="w-full" playsInline muted />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-24 w-64 rounded border-4 border-primary/60" />
-              </div>
-              <Button variant="secondary" size="sm" className="absolute right-2 top-2 gap-1.5" onClick={stopCamera}>
+          {/* Camera preview — always in DOM so videoRef is always available */}
+          <div className={cameraActive ? 'relative overflow-hidden rounded-xl border' : 'hidden'}>
+            {/* biome-ignore lint/a11y/useMediaCaption: live camera stream */}
+            <video
+              ref={videoRef}
+              className="w-full"
+              playsInline
+              autoPlay
+              muted
+            />
+            {/* Viewfinder overlay */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="h-24 w-64 rounded border-4 border-primary/60" />
+            </div>
+            {/* Controls */}
+            <div className="absolute right-2 top-2 flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1.5"
+                aria-label="Flip camera"
+                onClick={handleFlipCamera}
+              >
+                <FlipHorizontal className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="secondary" size="sm" className="gap-1.5" onClick={stopCamera}>
                 <X className="h-3.5 w-3.5" /> Stop
               </Button>
-              <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-white drop-shadow">
-                Point camera at a barcode
-              </p>
             </div>
-          )}
+            <p className="absolute bottom-2 left-0 right-0 text-center text-xs text-white drop-shadow">
+              Point camera at a barcode
+            </p>
+          </div>
 
           {/* Drop zone */}
           {!cameraActive && (status === 'idle' || status === 'error') && (
@@ -253,7 +288,7 @@ export default function BarcodeExtractorPage() {
 
           {/* Camera button */}
           {!cameraActive && (status === 'idle' || status === 'error') && (
-            <Button variant="outline" className="w-full gap-2" onClick={startCamera}>
+            <Button variant="outline" className="w-full gap-2" onClick={handleStartCamera}>
               <Camera className="h-4 w-4" />
               Scan with camera
             </Button>
