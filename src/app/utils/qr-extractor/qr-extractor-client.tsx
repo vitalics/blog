@@ -45,6 +45,7 @@ export default function QrExtractorPage() {
   // ---- camera state ----
   const [cameraActive, setCameraActive] = useState(false)
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
+  const [capturing, setCapturing] = useState(false) // shutter flash + freeze
   const [latestScan, setLatestScan] = useState<ScanResult | null>(null)
   const [history, setHistory] = useState<ScanResult[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -136,20 +137,30 @@ export default function QrExtractorPage() {
     startCamera(next)
   }
 
-  // Capture current video frame and scan it
+  // Capture current video frame: freeze video, flash, scan, then resume
   const handleCapture = async () => {
     const video = videoRef.current
-    if (!video || !streamRef.current) return
+    if (!video || !streamRef.current || capturing) return
+
+    // 1. Pause RAF loop so auto-scan doesn't interfere
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+
+    // 2. Freeze the video + trigger shutter flash
+    video.pause()
+    setCapturing(true)
+
+    // 3. Draw frozen frame to canvas
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(video, 0, 0)
-    const bitmap = await createImageBitmap(canvas)
+    if (ctx) ctx.drawImage(video, 0, 0)
+
+    // 4. Scan the frozen frame
     try {
       // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
       const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
+      const bitmap = await createImageBitmap(canvas)
       const detected = await detector.detect(bitmap)
       if (detected.length > 0) {
         addScan(detected[0].rawValue, detected[0].format)
@@ -159,6 +170,31 @@ export default function QrExtractorPage() {
         setTimeout(() => setLatestScan(orig), 1500)
       }
     } catch { /* ignore */ }
+
+    // 5. After 700 ms resume video and restart scan loop
+    setTimeout(() => {
+      setCapturing(false)
+      if (!streamRef.current) return
+      // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
+      video.play().then(() => {
+        const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
+        const scan = async () => {
+          if (!streamRef.current) return
+          if (!pauseRef.current) {
+            try {
+              const detected = await detector.detect(video)
+              if (detected.length > 0) {
+                addScan(detected[0].rawValue, detected[0].format)
+                pauseRef.current = true
+                setTimeout(() => { pauseRef.current = false }, 2000)
+              }
+            } catch { /* ignore */ }
+          }
+          rafRef.current = requestAnimationFrame(scan)
+        }
+        rafRef.current = requestAnimationFrame(scan)
+      }).catch(() => {})
+    }, 700)
   }
 
   // ---------------------------------------------------------------------------
@@ -266,6 +302,10 @@ export default function QrExtractorPage() {
             <div className="relative">
               {/* biome-ignore lint/a11y/useMediaCaption: live camera stream */}
               <video ref={videoRef} className="w-full" playsInline autoPlay muted />
+              {/* Shutter flash overlay */}
+              {capturing && (
+                <div className="pointer-events-none absolute inset-0 animate-shutter bg-white" />
+              )}
               {/* Viewfinder */}
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="h-48 w-48 rounded-lg border-4 border-primary/60" />
