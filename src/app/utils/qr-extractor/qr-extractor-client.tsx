@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ScanLine, Upload, Copy, Check, X, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ensureBarcodeDetector } from '@/lib/barcode-detector-polyfill'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,11 +44,9 @@ export default function QrExtractorPage() {
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number | null>(null)
 
-  // Check BarcodeDetector support on mount
+  // Ensure BarcodeDetector is available (native or polyfill)
   useEffect(() => {
-    if (!('BarcodeDetector' in window)) {
-      setStatus('unsupported')
-    }
+    ensureBarcodeDetector().catch(() => setStatus('unsupported'))
   }, [])
 
   // Cleanup camera on unmount
@@ -66,7 +65,7 @@ export default function QrExtractorPage() {
 
     try {
       // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not yet in TS lib
-      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
       const bitmap = await createImageBitmap(file)
       const detected = await detector.detect(bitmap)
 
@@ -130,7 +129,7 @@ export default function QrExtractorPage() {
       setCameraActive(true)
 
       // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
-      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      const detector = new (globalThis as any).BarcodeDetector({ formats: ['qr_code'] })
 
       const scan = async () => {
         if (!streamRef.current) return
@@ -193,7 +192,7 @@ export default function QrExtractorPage() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Browser not supported</p>
           <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-            QR code detection requires the <code>BarcodeDetector</code> API, available in Chrome, Edge, and Safari 17+.
+            QR code detection requires the <code>BarcodeDetector</code> API or WebAssembly support. Please use a modern browser.
           </p>
         </div>
       )}

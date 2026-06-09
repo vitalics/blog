@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Barcode, Upload, Copy, Check, X, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ensureBarcodeDetector } from '@/lib/barcode-detector-polyfill'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,19 +44,18 @@ export default function BarcodeExtractorPage() {
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number | null>(null)
 
-  // Check BarcodeDetector support and get supported formats
+  // Ensure BarcodeDetector is available (native or polyfill), then load supported formats
   useEffect(() => {
-    if (!('BarcodeDetector' in window)) {
-      setStatus('unsupported')
-      return
-    }
-    // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
-    ;(window as any).BarcodeDetector.getSupportedFormats().then((formats: string[]) => {
-      const filtered = formats.filter((f) => BARCODE_FORMATS.includes(f))
-      setSupportedFormats(filtered)
-    }).catch(() => {
-      setSupportedFormats(BARCODE_FORMATS)
-    })
+    ensureBarcodeDetector()
+      .then(() => {
+        // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
+        return (globalThis as any).BarcodeDetector.getSupportedFormats()
+      })
+      .then((formats: string[]) => {
+        const filtered = formats.filter((f) => BARCODE_FORMATS.includes(f))
+        setSupportedFormats(filtered.length > 0 ? filtered : BARCODE_FORMATS)
+      })
+      .catch(() => setStatus('unsupported'))
   }, [])
 
   useEffect(() => { return () => stopCamera() }, [])
@@ -72,7 +72,7 @@ export default function BarcodeExtractorPage() {
     try {
       const formats = supportedFormats.length > 0 ? supportedFormats : BARCODE_FORMATS
       // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
-      const detector = new (window as any).BarcodeDetector({ formats })
+      const detector = new (globalThis as any).BarcodeDetector({ formats })
       const bitmap = await createImageBitmap(file)
       const detected = await detector.detect(bitmap)
 
@@ -137,7 +137,7 @@ export default function BarcodeExtractorPage() {
 
       const formats = supportedFormats.length > 0 ? supportedFormats : BARCODE_FORMATS
       // biome-ignore lint/suspicious/noExplicitAny: BarcodeDetector not in TS lib
-      const detector = new (window as any).BarcodeDetector({ formats })
+      const detector = new (globalThis as any).BarcodeDetector({ formats })
 
       const scan = async () => {
         if (!streamRef.current) return
@@ -200,7 +200,7 @@ export default function BarcodeExtractorPage() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Browser not supported</p>
           <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-            Barcode detection requires the <code>BarcodeDetector</code> API, available in Chrome, Edge, and Safari 17+.
+            Barcode detection requires the <code>BarcodeDetector</code> API or WebAssembly support. Please use a modern browser.
           </p>
         </div>
       )}
