@@ -1,13 +1,14 @@
-import Link from "next/link";
 import {
-  ImageIcon,
   Archive,
+  Barcode,
+  FileSearch,
   FileText,
+  ImageIcon,
+  PenLine,
   QrCode,
   ScanLine,
-  Barcode,
-  PenLine,
 } from "lucide-react";
+import Link from "next/link";
 
 export const metadata = {
   title: "Utils",
@@ -62,6 +63,14 @@ const TOOLS = [
     description:
       "Decode QR codes from images or your camera. Uses the native browser BarcodeDetector API.",
     tags: ["qr", "scanner", "decoder", "camera"],
+  },
+  {
+    href: "/utils/metadata",
+    icon: FileSearch,
+    name: "File Metadata",
+    description:
+      "Inspect metadata of any file — size, MIME type, dimensions, duration, and SHA-256 hash. Nothing is uploaded.",
+    tags: ["metadata", "files", "hash"],
   },
   {
     href: "/utils/barcode-extractor",
