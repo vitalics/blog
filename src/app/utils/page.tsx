@@ -69,7 +69,7 @@ const TOOLS = [
     icon: FileSearch,
     name: "File Metadata",
     description:
-      "Inspect metadata of any file — size, MIME type, dimensions, duration, and SHA-256 hash. Nothing is uploaded.",
+      "Inspect metadata of any file — size, MIME type, dimensions, and SHA-256 hash. Audio and video files are also probed with ffmpeg.wasm for embedded tags and cover art.",
     tags: ["metadata", "files", "hash"],
   },
   {

@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Copy, FileSearch, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { extractMediaMetadata, type MediaMetadata } from "@/lib/ffmpeg-media";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,6 +16,7 @@ interface MetadataRow {
 }
 
 type Status = "idle" | "reading" | "done" | "error";
+type MediaStatus = "idle" | "loading-core" | "extracting" | "done" | "error";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -97,13 +99,22 @@ export default function MetadataClient() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [mediaStatus, setMediaStatus] = useState<MediaStatus>("idle");
+  const [mediaMeta, setMediaMeta] = useState<MediaMetadata | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const coverUrlRef = useRef<string | null>(null);
 
   const readFile = useCallback(async (file: File) => {
     setStatus("reading");
     setErrorMsg(null);
     setFileName(file.name);
+    setMediaMeta(null);
+    setMediaStatus("idle");
+    if (coverUrlRef.current) {
+      URL.revokeObjectURL(coverUrlRef.current);
+      coverUrlRef.current = null;
+    }
     try {
       const result: MetadataRow[] = [
         { label: "Name", value: file.name },
@@ -138,6 +149,18 @@ export default function MetadataClient() {
 
       setRows(result);
       setStatus("done");
+
+      // deep metadata extraction via ffmpeg.wasm (audio/video only)
+      if (file.type.startsWith("audio/") || file.type.startsWith("video/")) {
+        setMediaStatus("loading-core");
+        extractMediaMetadata(file, () => setMediaStatus("extracting"))
+          .then((meta) => {
+            coverUrlRef.current = meta.coverUrl;
+            setMediaMeta(meta);
+            setMediaStatus("done");
+          })
+          .catch(() => setMediaStatus("error"));
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to read file.");
       setStatus("error");
@@ -171,6 +194,12 @@ export default function MetadataClient() {
     setFileName("");
     setStatus("idle");
     setErrorMsg(null);
+    setMediaMeta(null);
+    setMediaStatus("idle");
+    if (coverUrlRef.current) {
+      URL.revokeObjectURL(coverUrlRef.current);
+      coverUrlRef.current = null;
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -178,6 +207,39 @@ export default function MetadataClient() {
   // ---------------------------------------------------------------------------
 
   const showDropZone = status === "idle" || status === "error";
+
+  const renderRows = (items: MetadataRow[]) => (
+    <div className="divide-y rounded-lg border bg-card">
+      {items.map((row) => (
+        <div
+          key={row.label}
+          className="flex items-start justify-between gap-4 px-4 py-3"
+        >
+          <span className="shrink-0 text-sm text-muted-foreground">
+            {row.label}
+          </span>
+          <div className="flex min-w-0 items-start gap-1.5">
+            <span className="break-all text-right font-mono text-sm">
+              {row.value}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0"
+              aria-label={`Copy ${row.label}`}
+              onClick={() => handleCopy(row.value)}
+            >
+              {copied === row.value ? (
+                <Check className="h-3.5 w-3.5 text-green-500" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -264,36 +326,57 @@ export default function MetadataClient() {
                 <X className="mr-1.5 h-3.5 w-3.5" /> Clear
               </Button>
             </div>
-            <div className="divide-y rounded-lg border bg-card">
-              {rows.map((row) => (
-                <div
-                  key={row.label}
-                  className="flex items-start justify-between gap-4 px-4 py-3"
-                >
-                  <span className="shrink-0 text-sm text-muted-foreground">
-                    {row.label}
-                  </span>
-                  <div className="flex min-w-0 items-start gap-1.5">
-                    <span className="break-all text-right font-mono text-sm">
-                      {row.value}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 shrink-0"
-                      aria-label={`Copy ${row.label}`}
-                      onClick={() => handleCopy(row.value)}
-                    >
-                      {copied === row.value ? (
-                        <Check className="h-3.5 w-3.5 text-green-500" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
+            {renderRows(rows)}
+
+            {/* ── ffmpeg media metadata ─────────────────────────────── */}
+            {(mediaStatus === "loading-core" ||
+              mediaStatus === "extracting") && (
+              <div className="flex items-center justify-center rounded-xl border px-4 py-6">
+                <p className="animate-pulse text-sm text-muted-foreground">
+                  {mediaStatus === "loading-core"
+                    ? "Loading ffmpeg core (~30 MB, downloaded once and cached)…"
+                    : "Extracting media metadata…"}
+                </p>
+              </div>
+            )}
+            {mediaStatus === "error" && (
+              <p className="text-sm text-muted-foreground">
+                Could not extract embedded media metadata.
+              </p>
+            )}
+            {mediaStatus === "done" && mediaMeta && (
+              <div className="space-y-3">
+                {mediaMeta.coverUrl && (
+                  <div className="flex justify-center rounded-lg border bg-card p-4">
+                    {/* biome-ignore lint/performance/noImgElement: blob URL from wasm FS, next/image can't optimize it */}
+                    <img
+                      src={mediaMeta.coverUrl}
+                      alt="Embedded cover art"
+                      className="max-h-48 rounded"
+                    />
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+                {mediaMeta.tags.length > 0 && (
+                  <>
+                    <p className="text-sm font-medium">Embedded tags</p>
+                    {renderRows(mediaMeta.tags)}
+                  </>
+                )}
+                {mediaMeta.streams.length > 0 && (
+                  <>
+                    <p className="text-sm font-medium">Streams</p>
+                    <div className="space-y-1.5 rounded-lg border bg-card px-4 py-3">
+                      {mediaMeta.streams.map((stream) => (
+                        <p key={stream} className="break-all font-mono text-xs">
+                          {stream}
+                        </p>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <Button variant="outline" className="w-full" onClick={handleClear}>
               Inspect another file
             </Button>
