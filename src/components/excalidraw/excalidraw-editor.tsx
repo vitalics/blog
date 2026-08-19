@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Excalidraw, exportToBlob, exportToSvg } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "@excalidraw/excalidraw/index.css";
-import { KeybindManager } from "@/lib/keybind";
+import { createKeybindManager } from "@/lib/keybind";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   ArrowLeft,
   Download,
@@ -19,6 +25,10 @@ import {
   Save,
   MoreHorizontal,
   Share2,
+  ZoomIn,
+  ZoomOut,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "@/components/theme-provider";
@@ -163,6 +173,8 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
   const libraryItemsRef = useRef<any[]>([]);
   useEffect(() => { libraryItemsRef.current = libraryItems; }, [libraryItems]);
   const [libraryLoaded, setLibraryLoaded] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const [zoomInput, setZoomInput] = useState("100");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -178,6 +190,18 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
 
   const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null);
   useEffect(() => { excalidrawAPIRef.current = excalidrawAPI; }, [excalidrawAPI]);
+
+  // Sync zoom display whenever Excalidraw's viewport changes
+  useEffect(() => {
+    if (!excalidrawAPI) return;
+    // biome-ignore lint/suspicious/noExplicitAny: zoom type not publicly exported
+    const unsub = excalidrawAPI.onScrollChange((_x, _y, zoom: any) => {
+      const pct = Math.round((zoom?.value ?? 1) * 100);
+      setZoomLevel(pct);
+      setZoomInput(String(pct));
+    });
+    return () => unsub();
+  }, [excalidrawAPI]);
 
   const excalidrawContainerRef = useRef<HTMLDivElement>(null);
 
@@ -442,43 +466,62 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
   }, []);
 
   // ---------------------------------------------------------------------------
+  // Canvas action helpers
+  // The buttons use onMouseDown+preventDefault to keep focus on Excalidraw,
+  // so by the time onClick fires the canvas is still active and Excalidraw's
+  // keydown guard (contains(activeElement)) passes without any focus juggling.
+  // ---------------------------------------------------------------------------
+  const dispatchKey = useCallback((key: string, code: string, opts: { ctrlKey?: boolean; shiftKey?: boolean; metaKey?: boolean } = {}) => {
+    window.dispatchEvent(new KeyboardEvent("keydown", {
+      key,
+      code,
+      ctrlKey: opts.ctrlKey ?? false,
+      shiftKey: opts.shiftKey ?? false,
+      metaKey: opts.metaKey ?? false,
+      bubbles: true,
+      cancelable: true,
+    }));
+  }, []);
+
+  const handleZoomIn  = useCallback(() => dispatchKey("=", "Equal",  { ctrlKey: true }), [dispatchKey]);
+  const handleZoomOut = useCallback(() => dispatchKey("-", "Minus",  { ctrlKey: true }), [dispatchKey]);
+  const handleUndo    = useCallback(() => dispatchKey("z", "KeyZ",   { ctrlKey: true }), [dispatchKey]);
+  const handleRedo    = useCallback(() => dispatchKey("z", "KeyZ",   { ctrlKey: true, shiftKey: true }), [dispatchKey]);
+
+  // ---------------------------------------------------------------------------
+  // Zoom input — commit a specific zoom % via updateScene
+  // ---------------------------------------------------------------------------
+  const commitZoom = useCallback((value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    const clamped = Math.min(3000, Math.max(10, Number.isNaN(parsed) ? zoomLevel : parsed));
+    setZoomLevel(clamped);
+    setZoomInput(String(clamped));
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+    // biome-ignore lint/suspicious/noExplicitAny: zoom value type not publicly exported
+    api.updateScene({ appState: { zoom: { value: (clamped / 100) as any } } });
+  }, [zoomLevel]);
+
+  // ---------------------------------------------------------------------------
   // Global keybinds
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    const km = new KeybindManager(document.body);
-
-    // Ctrl+S — manual save (prevent browser "Save page" dialog)
-    km.register("ctrl+s", ({ event }) => {
+    // Capture-phase manager on document — intercepts Ctrl+S before Excalidraw
+    // or the browser's native "Save page" handler can act on it.
+    const captureKm = createKeybindManager(document, { capture: true });
+    captureKm.register("ctrl+s", ({ event }) => {
       event.preventDefault();
+      event.stopPropagation();
+      handleSave();
+    });
+    // Also handle Cmd+S on macOS
+    captureKm.register("meta+s", ({ event }) => {
+      event.preventDefault();
+      event.stopPropagation();
       handleSave();
     });
 
-    // Ctrl+Z / Ctrl+Shift+Z — undo/redo forwarded to Excalidraw container
-    // Excalidraw handles these natively when its canvas is focused; we forward
-    // the event from document level so they work even when focus is in the toolbar.
-    const forwardToCanvas = (event: KeyboardEvent) => {
-      const container = excalidrawContainerRef.current;
-      if (!container) return;
-      // Only forward if the event did not originate inside the canvas already
-      if (container.contains(event.target as Node)) return;
-      event.preventDefault();
-      const clone = new KeyboardEvent("keydown", {
-        key: event.key,
-        code: event.code,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        bubbles: true,
-        cancelable: true,
-      });
-      container.dispatchEvent(clone);
-    };
-
-    km.register("ctrl+z", ({ event }) => forwardToCanvas(event));
-    km.register("ctrl+shift+z", ({ event }) => forwardToCanvas(event));
-
-    return () => km.dispose();
+    return () => captureKm.dispose();
   }, [handleSave]);
 
   // ---------------------------------------------------------------------------
@@ -741,107 +784,133 @@ export default function ExcalidrawEditor({ initialHash = "" }: { initialHash?: s
           </button>
         )}
 
-        {/* Right-side actions — full toolbar on md+, overflow menu on mobile */}
+        {/* Right-side actions */}
         <div className="ml-auto flex items-center gap-1">
           <input ref={fileInputRef} type="file" accept=".excalidraw,application/json" className="hidden" onChange={handleImport} />
 
-          {/* Desktop toolbar */}
-          <div className="hidden md:flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={createSession} className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              New
-            </Button>
-
-            <div className="mx-1 h-4 w-px bg-border" />
-
-            <Button variant="ghost" size="sm" onClick={handleSave} className="gap-1.5">
-              <Save className="h-4 w-4" />
-              Save
-            </Button>
-
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
-              <Upload className="h-4 w-4" />
-              Import
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5">
-                  <Download className="h-4 w-4" />
-                  Export
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          {/* Canvas controls — always visible.
+              onMouseDown preventDefault keeps focus on the Excalidraw canvas
+              so the canvas-action dispatch sees the correct activeElement. */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onMouseDown={(e) => e.preventDefault()} onClick={handleUndo} aria-label="Undo">
+                  <Undo2 className="h-4 w-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportPng}>PNG</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportSvg}>SVG</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportJson}>.excalidraw</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </TooltipTrigger>
+              <TooltipContent><kbd className="font-mono">Ctrl</kbd>+<kbd className="font-mono">Z</kbd></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-            {canShare && (
-              <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
-                <Share2 className="h-4 w-4" />
-                Share
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onMouseDown={(e) => e.preventDefault()} onClick={handleRedo} aria-label="Redo">
+                  <Redo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><kbd className="font-mono">Ctrl</kbd>+<kbd className="font-mono">Shift</kbd>+<kbd className="font-mono">Z</kbd></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <div className="mx-1 h-4 w-px bg-border" />
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onMouseDown={(e) => e.preventDefault()} onClick={handleZoomOut} aria-label="Zoom out">
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><kbd className="font-mono">Ctrl</kbd>+<kbd className="font-mono">-</kbd></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onMouseDown={(e) => e.preventDefault()} onClick={handleZoomIn} aria-label="Zoom in">
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><kbd className="font-mono">Ctrl</kbd>+<kbd className="font-mono">=</kbd></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <input
+            type="text"
+            inputMode="numeric"
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value)}
+            onBlur={() => commitZoom(zoomInput)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { commitZoom(zoomInput); e.currentTarget.blur(); }
+              if (e.key === "Escape") { setZoomInput(String(zoomLevel)); e.currentTarget.blur(); }
+            }}
+            aria-label="Zoom level"
+            className="w-12 rounded border bg-background px-1.5 py-0.5 text-center text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <span className="text-xs text-muted-foreground">%</span>
+
+          <div className="mx-1 h-4 w-px bg-border" />
+
+          {/* Options dropdown — same for mobile and desktop */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Options">
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            )}
-
-            <div className="mx-1 h-4 w-px bg-border" />
-
-            <Button variant="ghost" size="sm" onClick={handleClear} className="gap-1.5 text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" />
-              Clear
-            </Button>
-          </div>
-
-          {/* Mobile overflow menu */}
-          <div className="flex md:hidden items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={handleSave} aria-label="Save">
-              <Save className="h-4 w-4" />
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More actions">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={createSession}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New session
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={createSession}>
+                <Plus className="h-4 w-4 mr-2" />
+                New session
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSave}>
+                <Save className="h-4 w-4 mr-2" />
+                Save
+                <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                  <kbd className="font-mono">Ctrl</kbd>+<kbd className="font-mono">S</kbd>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleExportPng}>
+                <Download className="h-4 w-4 mr-2" />
+                Export PNG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportSvg}>
+                <Download className="h-4 w-4 mr-2" />
+                Export SVG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportJson}>
+                <Download className="h-4 w-4 mr-2" />
+                Export .excalidraw
+              </DropdownMenuItem>
+              {canShare && (
+                <DropdownMenuItem onClick={handleShare}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share as PNG
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPng}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export PNG
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportSvg}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export SVG
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportJson}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export .excalidraw
-                </DropdownMenuItem>
-                {canShare && (
-                  <DropdownMenuItem onClick={handleShare}>
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share as PNG
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleClear} className="text-destructive focus:text-destructive">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear canvas
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleClear} className="text-destructive focus:text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear canvas
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => deleteSession(currentIdRef.current)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete session
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
